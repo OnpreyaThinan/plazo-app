@@ -1,0 +1,36 @@
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "plazo-c83e7",
+          "appId": "1:63966643748:android:b6d7f27c07ce9830b9fab1",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "plazo-c83e7",
+          "configurations": {
+            "android": "1:63966643748:android:b6d7f27c07ce9830b9fab1",
+            "web": "1:63966643748:web:a53e84ca47bcf2aab9fab1"
+          }
+        }
+      }
+    }
+  }
+}

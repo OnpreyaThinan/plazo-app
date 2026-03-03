@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'firebase_options.dart';
 import 'app_colors.dart';
-import 'app_strings.dart';
 import 'models.dart';
 import 'navigation_wrapper.dart';
 import 'screens/login_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const PlazoApp());
 }
 
@@ -42,11 +47,12 @@ class _PlazoAppState extends State<PlazoApp> {
       return baseTheme.copyWith(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.darkBg,
-        appBarTheme: AppBarTheme(
-          backgroundColor: AppColors.darkBg,
+        appBarTheme: const AppBarTheme(
           elevation: 0,
         ),
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme).apply(
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme,
+        ).apply(
           bodyColor: Colors.white,
           displayColor: Colors.white,
         ),
@@ -69,7 +75,8 @@ class _PlazoAppState extends State<PlazoApp> {
                 _currentUser = UserProfile(
                   name: name,
                   email: email,
-                  avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=$name",
+                  avatarUrl:
+                      "https://api.dicebear.com/7.x/avataaars/svg?seed=$name",
                 );
               }),
             )

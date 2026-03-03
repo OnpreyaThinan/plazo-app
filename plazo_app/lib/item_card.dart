@@ -58,13 +58,30 @@ class ItemCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        isExam ? Icons.access_time : Icons.calendar_today,
+                        Icons.calendar_today,
                         size: 12,
                         color: Colors.grey[400],
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isExam ? item.time : item.date,
+                        item.date,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[400],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text("•", style: TextStyle(color: Colors.grey)),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        item.time,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,

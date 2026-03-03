@@ -34,10 +34,15 @@ class _EditScreenState extends State<EditScreen> {
     _type = widget.item.type;
     _subjectController = TextEditingController(text: widget.item.subject);
     _titleController = TextEditingController(text: widget.item.title);
-    _locationController = TextEditingController(text: widget.item.location ?? '');
-    _descController = TextEditingController(text: widget.item.description);
-    _selectedDate = _parseDate(widget.item.date) ?? DateTime.now();
-    _selectedTime = _parseTime(widget.item.time) ?? const TimeOfDay(hour: 9, minute: 0);
+    _locationController =
+        TextEditingController(text: widget.item.location ?? '');
+    _descController =
+        TextEditingController(text: widget.item.description);
+    _selectedDate =
+        _parseDate(widget.item.date) ?? DateTime.now();
+    _selectedTime =
+        _parseTime(widget.item.time) ??
+            const TimeOfDay(hour: 9, minute: 0);
   }
 
   @override
@@ -51,9 +56,7 @@ class _EditScreenState extends State<EditScreen> {
 
   DateTime? _parseDate(String value) {
     final parts = value.split('/');
-    if (parts.length != 3) {
-      return null;
-    }
+    if (parts.length != 3) return null;
     final day = int.tryParse(parts[0]);
     final month = int.tryParse(parts[1]);
     final year = int.tryParse(parts[2]);
@@ -65,14 +68,10 @@ class _EditScreenState extends State<EditScreen> {
 
   TimeOfDay? _parseTime(String value) {
     final parts = value.split(':');
-    if (parts.length != 2) {
-      return null;
-    }
+    if (parts.length != 2) return null;
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) {
-      return null;
-    }
+    if (hour == null || minute == null) return null;
     return TimeOfDay(hour: hour, minute: minute);
   }
 
@@ -80,8 +79,10 @@ class _EditScreenState extends State<EditScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      firstDate:
+          DateTime.now().subtract(const Duration(days: 1)),
+      lastDate:
+          DateTime.now().add(const Duration(days: 365 * 2)),
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
@@ -92,7 +93,6 @@ class _EditScreenState extends State<EditScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
-      initialEntryMode: TimePickerEntryMode.dial,
     );
     if (picked != null) {
       setState(() => _selectedTime = picked);
@@ -102,8 +102,7 @@ class _EditScreenState extends State<EditScreen> {
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');
     final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    return "$day/$month/$year";
+    return "$day/$month/${date.year}";
   }
 
   String _formatTime(TimeOfDay time) {
@@ -113,9 +112,8 @@ class _EditScreenState extends State<EditScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _save() {
@@ -144,7 +142,8 @@ class _EditScreenState extends State<EditScreen> {
       date: _formatDate(_selectedDate),
       time: _formatTime(_selectedTime),
       description: _descController.text.trim(),
-      location: _type == ItemType.exam ? location : null,
+      location:
+          _type == ItemType.exam ? location : null,
       isCompleted: widget.item.isCompleted,
     );
 
@@ -160,13 +159,17 @@ class _EditScreenState extends State<EditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final typeLabel = _type == ItemType.exam ? "EXAMS" : "TASKS";
-    final typeColor = _type == ItemType.exam ? AppColors.accentPink : AppColors.accentBlue;
+    final typeLabel =
+        _type == ItemType.exam ? "EXAMS" : "TASKS";
+    final typeColor =
+        _type == ItemType.exam
+            ? AppColors.accentPink
+            : AppColors.accentBlue;
 
     return Scaffold(
-      backgroundColor: AppColors.bgDetailLight,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: AppColors.bgDetailLight,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: _circleIconButton(
           icon: Icons.arrow_back,
@@ -188,84 +191,93 @@ class _EditScreenState extends State<EditScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.08),
+              AppColors.accentBlue.withOpacity(0.08),
+              Colors.white,
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: typeColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  typeLabel,
-                  style: TextStyle(
-                    color: typeColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6),
+                  decoration: BoxDecoration(
+                    color:
+                        typeColor.withOpacity(0.2),
+                    borderRadius:
+                        BorderRadius.circular(12),
                   ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _buildField(
-                "Subject",
-                _subjectController,
-                outlined: true,
-              ),
-              _buildField(
-                "Activity",
-                _titleController,
-                filled: true,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPickerField(
-                      label: "Due Date",
-                      value: _formatDate(_selectedDate),
-                      icon: Icons.calendar_today,
-                      onTap: _pickDate,
+                  child: Text(
+                    typeLabel,
+                    style: TextStyle(
+                      color: typeColor,
+                      fontSize: 10,
+                      fontWeight:
+                          FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildPickerField(
-                      label: "Time",
-                      value: _formatTime(_selectedTime),
-                      icon: Icons.access_time,
-                      onTap: _pickTime,
-                    ),
-                  ),
-                ],
-              ),
-              if (_type == ItemType.exam)
-                _buildField(
-                  "Location",
-                  _locationController,
-                  filled: true,
                 ),
-              _buildField(
-                "Brief Notes",
-                _descController,
-                isLong: true,
-                filled: true,
-              ),
-            ],
+                const SizedBox(height: 14),
+                _buildField("Subject",
+                    _subjectController,
+                    outlined: true),
+                _buildField("Activity",
+                    _titleController,
+                    filled: true),
+                Row(
+                  children: [
+                    Expanded(
+                      child:
+                          _buildPickerField(
+                        value: _formatDate(
+                            _selectedDate),
+                        icon: Icons
+                            .calendar_today,
+                        onTap: _pickDate,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child:
+                          _buildPickerField(
+                        value: _formatTime(
+                            _selectedTime),
+                        icon: Icons
+                            .access_time,
+                        onTap: _pickTime,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_type == ItemType.exam)
+                  _buildField("Location",
+                      _locationController,
+                      filled: true),
+                _buildField("Brief Notes",
+                    _descController,
+                    isLong: true,
+                    filled: true),
+              ],
+            ),
           ),
         ),
       ),
@@ -279,59 +291,69 @@ class _EditScreenState extends State<EditScreen> {
     bool filled = false,
     bool outlined = false,
   }) {
-    final fillColor = filled ? AppColors.bgInput : Colors.transparent;
-    final borderColor = outlined ? Colors.black87 : Colors.transparent;
-
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding:
+          const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: controller,
         maxLines: isLong ? 4 : 1,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
           filled: true,
-          fillColor: fillColor,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide(color: borderColor, width: outlined ? 1.2 : 0),
+          fillColor: filled
+              ? AppColors.bgInput
+              : Colors.transparent,
+          border: OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(22),
+            borderSide: BorderSide(
+              color: outlined
+                  ? Colors.black87
+                  : Colors.transparent,
+            ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide(color: AppColors.primary, width: 1.4),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         ),
       ),
     );
   }
 
   Widget _buildPickerField({
-    required String label,
     required String value,
     required IconData icon,
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding:
+          const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding:
+              const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16),
           decoration: BoxDecoration(
             color: AppColors.bgInput,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius:
+                BorderRadius.circular(20),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   value,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style:
+                      const TextStyle(
+                          fontWeight:
+                              FontWeight.w700),
                 ),
               ),
-              Icon(icon, size: 18, color: Colors.grey[500]),
+              Icon(icon,
+                  size: 18,
+                  color:
+                      Colors.grey[500]),
             ],
           ),
         ),
@@ -346,7 +368,8 @@ class _EditScreenState extends State<EditScreen> {
     bool filled = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(left: 12),
+      padding:
+          const EdgeInsets.only(left: 12),
       child: InkResponse(
         onTap: onTap,
         radius: 24,
@@ -354,17 +377,18 @@ class _EditScreenState extends State<EditScreen> {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: filled ? AppColors.primary : Colors.white,
+            color: filled
+                ? AppColors.primary
+                : Colors.white,
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
-          child: Icon(icon, color: filled ? Colors.white : iconColor, size: 20),
+          child: Icon(
+            icon,
+            color: filled
+                ? Colors.white
+                : iconColor,
+            size: 20,
+          ),
         ),
       ),
     );

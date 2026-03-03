@@ -17,9 +17,21 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.08),
+              AppColors.accentBlue.withOpacity(0.08),
+              Colors.white,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
             children: [
@@ -87,31 +99,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _socialButton(
-                    context,
-                    "https://cdn-icons-png.flaticon.com/512/124/124010.png",
-                    "Facebook sign-in",
-                  ),
-                  const SizedBox(width: 18),
-                  _socialButton(
-                    context,
-                    "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
-                    "Google sign-in",
-                  ),
-                  const SizedBox(width: 18),
-                  _socialButton(
-                    context,
-                    "https://cdn-icons-png.flaticon.com/512/0/747.png",
-                    "Apple sign-in",
-                  ),
-                ],
+              Center(
+                child: _socialButton(
+                  context,
+                  "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
+                  "Google sign-in",
+                ),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }

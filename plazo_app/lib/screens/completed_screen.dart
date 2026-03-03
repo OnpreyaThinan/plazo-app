@@ -14,8 +14,21 @@ class CompletedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final completed = items.where((i) => i.isCompleted).toList();
 
-    return SafeArea(
-      child: ListView(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary.withOpacity(0.08),
+            AppColors.accentBlue.withOpacity(0.08),
+            Colors.white,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           const Text("Finished", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
@@ -35,6 +48,7 @@ class CompletedScreen extends StatelessWidget {
               ),
             ),
         ],
+      ),
       ),
     );
   }

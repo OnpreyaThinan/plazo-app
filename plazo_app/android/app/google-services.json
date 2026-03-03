@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "63966643748",
+    "project_id": "plazo-c83e7",
+    "storage_bucket": "plazo-c83e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63966643748:android:b6d7f27c07ce9830b9fab1",
+        "android_client_info": {
+          "package_name": "com.example.plazo_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "63966643748-4mqm3mn33ebelttupl358cdbm6365ctt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYZ9d52fMB1wA7K0-kavdHHCYroJD9QD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "63966643748-4mqm3mn33ebelttupl358cdbm6365ctt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
