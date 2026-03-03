@@ -86,7 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
           colors: [
             AppColors.primary.withOpacity(0.08),
             AppColors.accentBlue.withOpacity(0.08),
-            Colors.white,
+            Theme.of(context).brightness == Brightness.dark 
+              ? Colors.grey[900]! 
+              : Colors.white,
           ],
           stops: const [0.0, 0.5, 1.0],
         ),
@@ -281,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: active
             ? AppColors.primary
-            : Colors.white,
+            : AppColors.getCardBackgroundColor(context),
         borderRadius:
             BorderRadius.circular(24),
         border: active
@@ -301,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   FontWeight.w800,
               color: active
                   ? Colors.white
-                  : Colors.grey,
+                  : AppColors.getTextColor(context),
             ),
           ),
           Text(
@@ -313,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
               color: active
                   ? Colors.white
                       .withOpacity(0.7)
-                  : Colors.grey[300],
+                  : AppColors.getSecondaryTextColor(context),
             ),
           ),
         ],

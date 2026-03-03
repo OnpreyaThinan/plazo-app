@@ -22,7 +22,9 @@ class CompletedScreen extends StatelessWidget {
           colors: [
             AppColors.primary.withOpacity(0.08),
             AppColors.accentBlue.withOpacity(0.08),
-            Colors.white,
+            Theme.of(context).brightness == Brightness.dark 
+              ? Colors.grey[900]! 
+              : Colors.white,
           ],
           stops: const [0.0, 0.5, 1.0],
         ),
@@ -34,10 +36,10 @@ class CompletedScreen extends StatelessWidget {
           const Text("Finished", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
           const SizedBox(height: 20),
           if (completed.isEmpty)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.only(top: 100),
-                child: Text("No completed tasks yet", style: TextStyle(color: Colors.grey)),
+                padding: const EdgeInsets.only(top: 100),
+                child: Text("No completed tasks yet", style: TextStyle(color: AppColors.getSecondaryTextColor(context))),
               ),
             )
           else

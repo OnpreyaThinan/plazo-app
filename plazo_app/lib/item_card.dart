@@ -20,7 +20,7 @@ class ItemCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.getCardBackgroundColor(context),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: AppColors.border, width: 1.5),
           boxShadow: [
@@ -48,10 +48,10 @@ class ItemCard extends StatelessWidget {
                 children: [
                   Text(
                     item.subject,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textMain,
+                      color: AppColors.getTextColor(context),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -72,7 +72,7 @@ class ItemCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text("•", style: TextStyle(color: Colors.grey)),
+                      Text("•", style: TextStyle(color: AppColors.getSecondaryTextColor(context))),
                       const SizedBox(width: 8),
                       Icon(
                         Icons.access_time,
@@ -88,16 +88,17 @@ class ItemCard extends StatelessWidget {
                           color: Colors.grey[400],
                         ),
                       ),
-                      if (isExam && item.location != null) ...[
-                        const SizedBox(width: 8),
-                        const Text("•", style: TextStyle(color: Colors.grey)),
-                        const SizedBox(width: 8),
+                    ],
+                  ),
+                  if (isExam && item.location != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
                         Icon(Icons.location_on, size: 12, color: Colors.grey[400]),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             item.location!,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
@@ -105,9 +106,9 @@ class ItemCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ]
-                    ],
-                  )
+                      ],
+                    ),
+                  ]
                 ],
               ),
             ),

@@ -9,7 +9,12 @@ class DetailScreen extends StatefulWidget {
   final Function(PlazoItem) onUpdate;
   final Function(String) onDelete;
 
-  const DetailScreen({super.key, required this.item, required this.onUpdate, required this.onDelete});
+  const DetailScreen({
+    super.key,
+    required this.item,
+    required this.onUpdate,
+    required this.onDelete,
+  });
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -43,185 +48,225 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    extendBodyBehindAppBar: true,
-    appBar: AppBar(
+  Widget build(BuildContext context) {
+    return Scaffold(
       backgroundColor: Colors.transparent,
-      elevation: 0,
-      leading: _circleIconButton(
-        icon: Icons.arrow_back,
-        onTap: () => Navigator.pop(context),
-      ),
-      actions: [
-        _circleIconButton(
-          icon: Icons.delete_outline,
-          iconColor: Colors.redAccent,
-          onTap: () {
-            widget.onDelete(_item.id);
-            Navigator.pop(context);
-          },
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: _circleIconButton(
+          icon: Icons.arrow_back,
+          onTap: () => Navigator.pop(context),
         ),
-        const SizedBox(width: 8),
-        _circleIconButton(
-          icon: Icons.edit_outlined,
-          iconColor: AppColors.primary,
-          onTap: _openEdit,
-        ),
-        const SizedBox(width: 12),
-      ],
-    ),
-    body: Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.08),
-            AppColors.accentBlue.withOpacity(0.08),
-            Colors.white,
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 24,
-                offset: const Offset(0, 12),
-              ),
-            ],
+        actions: [
+          _circleIconButton(
+            icon: Icons.delete_outline,
+            iconColor: Colors.redAccent,
+            onTap: () {
+              widget.onDelete(_item.id);
+              Navigator.pop(context);
+            },
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: (_item.type == ItemType.exam
-                          ? AppColors.accentPink
-                          : AppColors.accentBlue)
-                      .withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _item.type == ItemType.exam ? "EXAM" : "TASK",
-                  style: TextStyle(
-                    color: _item.type == ItemType.exam
-                        ? AppColors.accentPink
-                        : AppColors.accentBlue,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+          const SizedBox(width: 8),
+          _circleIconButton(
+            icon: Icons.edit_outlined,
+            iconColor: AppColors.primary,
+            onTap: _openEdit,
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primary.withOpacity(0.08),
+              AppColors.accentBlue.withOpacity(0.08),
+              Theme.of(context).brightness == Brightness.dark
+                  ? Colors.grey[900]!
+                  : Colors.white,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.getCardBackgroundColor(context),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _item.subject,
-                style: const TextStyle(
-                    fontSize: 30, fontWeight: FontWeight.w900),
-              ),
-              Text(
-                _item.title,
-                style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                      child:
-                          _infoRow(Icons.calendar_today, _item.date)),
-                  const SizedBox(width: 16),
-                  Expanded(
-                      child:
-                          _infoRow(Icons.access_time, _item.time)),
                 ],
               ),
-              if (_item.location != null) ...[
-                const SizedBox(height: 10),
-                _infoRow(Icons.location_on, _item.location!),
-              ],
-              const SizedBox(height: 24),
-              const Text(
-                "BRIEF NOTES",
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.grey),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.bgInput,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Text(
-                  _item.description.isEmpty
-                      ? "No additional notes."
-                      : _item.description,
-                  style: const TextStyle(
-                      height: 1.5, color: AppColors.textMain),
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
-                  _item.isCompleted = !_item.isCompleted;
-                  widget.onUpdate(_item);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _item.isCompleted
-                      ? Colors.grey[200]
-                      : AppColors.primary,
-                  minimumSize: const Size(double.infinity, 60),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25)),
-                  elevation: 0,
-                ),
-                child: Text(
-                  _item.isCompleted
-                      ? "Move to Pending"
-                      : "Done",
-                  style: TextStyle(
-                    color: _item.isCompleted
-                        ? Colors.grey
-                        : Colors.white,
-                    fontWeight: FontWeight.bold,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: (_item.type == ItemType.exam
+                              ? AppColors.accentPink
+                              : AppColors.accentBlue)
+                          .withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _item.type == ItemType.exam ? "EXAM" : "TASK",
+                      style: TextStyle(
+                        color: _item.type == ItemType.exam
+                            ? AppColors.accentPink
+                            : AppColors.accentBlue,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _item.subject,
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    _item.title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color:
+                          AppColors.getSecondaryTextColor(context),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _infoRow(
+                          Icons.calendar_today,
+                          _item.date,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _infoRow(
+                          Icons.access_time,
+                          _item.time,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_item.location != null) ...[
+                    const SizedBox(height: 10),
+                    _infoRow(Icons.location_on, _item.location!),
+                  ],
+                  const SizedBox(height: 24),
+                  Text(
+                    "BRIEF NOTES",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color:
+                          AppColors.getSecondaryTextColor(context),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color:
+                          AppColors.getInputBackgroundColor(context),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Text(
+                      _item.description.isEmpty
+                          ? "No additional notes."
+                          : _item.description,
+                      style: TextStyle(
+                        height: 1.5,
+                        color:
+                            AppColors.getTextColor(context),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () {
+                      _item.isCompleted =
+                          !_item.isCompleted;
+                      widget.onUpdate(_item);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _item.isCompleted
+                          ? AppColors.getInputBackgroundColor(
+                              context)
+                          : AppColors.primary,
+                      minimumSize:
+                          const Size(double.infinity, 60),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(25),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      _item.isCompleted
+                          ? "Move to Pending"
+                          : "Done",
+                      style: TextStyle(
+                        color: _item.isCompleted
+                            ? AppColors
+                                .getSecondaryTextColor(
+                                    context)
+                            : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
-  Widget _infoRow(IconData icon, String text) => Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 18),
-          const SizedBox(width: 8),
-          Text(text, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-        ],
-      );
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 18),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.getSecondaryTextColor(context),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _circleIconButton({
     required IconData icon,
     required VoidCallback onTap,
-    Color iconColor = Colors.black87,
+    Color? iconColor,
   }) {
     return Padding(
       padding: const EdgeInsets.only(left: 12),
@@ -232,7 +277,7 @@ Widget build(BuildContext context) {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.getCardBackgroundColor(context),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -242,7 +287,12 @@ Widget build(BuildContext context) {
               ),
             ],
           ),
-          child: Icon(icon, color: iconColor, size: 20),
+          child: Icon(
+            icon,
+            color:
+                iconColor ?? AppColors.getTextColor(context),
+            size: 20,
+          ),
         ),
       ),
     );

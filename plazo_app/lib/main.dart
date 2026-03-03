@@ -49,6 +49,7 @@ class _PlazoAppState extends State<PlazoApp> {
         scaffoldBackgroundColor: AppColors.darkBg,
         appBarTheme: const AppBarTheme(
           elevation: 0,
+          backgroundColor: Colors.transparent,
         ),
         textTheme: GoogleFonts.plusJakartaSansTextTheme(
           ThemeData.dark().textTheme,
@@ -56,9 +57,17 @@ class _PlazoAppState extends State<PlazoApp> {
           bodyColor: Colors.white,
           displayColor: Colors.white,
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey[850],
+          hintStyle: const TextStyle(color: Colors.grey),
+          labelStyle: const TextStyle(color: Colors.white),
+        ),
       );
     }
-    return baseTheme;
+    return baseTheme.copyWith(
+      appBarTheme: const AppBarTheme(elevation: 0),
+    );
   }
 
   @override

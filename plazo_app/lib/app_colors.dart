@@ -18,4 +18,36 @@ class AppColors {
   
   // Dark mode
   static const Color darkBg = Color(0xFF1A1A1A);
+  
+  // Helper method for theme-aware colors
+  static Color getTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : textMain;
+  }
+  
+  static Color getSecondaryTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[400]!
+        : Colors.grey;
+  }
+  
+  static Color getCardBackgroundColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[900]!
+        : Colors.white;
+  }
+  
+  static Color getDividerColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[700]!
+        : Colors.grey[200]!;
+  }
+  
+  static Color getInputBackgroundColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? Colors.grey[850]!
+        : bgInput;
+  }
 }
+

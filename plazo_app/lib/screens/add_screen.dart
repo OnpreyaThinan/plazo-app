@@ -17,13 +17,13 @@ class _AddScreenState extends State<AddScreen> {
   final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _descController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 9, minute: 0);
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
     );
@@ -33,11 +33,9 @@ class _AddScreenState extends State<AddScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showDialog<TimeOfDay>(
+    final picked = await showTimePicker(
       context: context,
-      builder: (context) => TimePickerDialog(
-        initialTime: _selectedTime,
-      ),
+      initialTime: _selectedTime ?? const TimeOfDay(hour: 9, minute: 0),
     );
     if (picked != null) {
       setState(() => _selectedTime = picked);
@@ -64,8 +62,8 @@ class _AddScreenState extends State<AddScreen> {
     _descController.clear();
     setState(() {
       _type = ItemType.task;
-      _selectedDate = DateTime.now();
-      _selectedTime = const TimeOfDay(hour: 9, minute: 0);
+      _selectedDate = null;
+      _selectedTime = null;
     });
     FocusScope.of(context).unfocus();
   }
@@ -87,7 +85,9 @@ class _AddScreenState extends State<AddScreen> {
             colors: [
               AppColors.primary.withOpacity(0.08),
               AppColors.accentBlue.withOpacity(0.08),
-              Colors.white,
+              Theme.of(context).brightness == Brightness.dark 
+                ? Colors.grey[900]! 
+                : Colors.white,
             ],
             stops: const [0.0, 0.5, 1.0],
           ),
@@ -106,7 +106,7 @@ class _AddScreenState extends State<AddScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.bgInput,
+                    color: AppColors.getInputBackgroundColor(context),
                     borderRadius: BorderRadius.circular(25),
                   ),
                   child: Row(
@@ -129,12 +129,19 @@ class _AddScreenState extends State<AddScreen> {
                     hint: "e.g. Mathematics"),
                 _buildField("Activity", _titleController,
                     hint: "e.g. Midterm Prep"),
+                if (_type == ItemType.exam)
+                  _buildField("Location", _locationController,
+                      hint: "e.g. Exam Hall B"),
+                _buildField("Brief Notes", _descController,
+                    isLong: true, hint: "Add some notes..."),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: _buildPickerField(
                         label: "Due Date",
-                        value: _formatDate(_selectedDate),
+                        value: _selectedDate != null ? _formatDate(_selectedDate!) : "",
+                        hint: "Select a date",
                         icon: Icons.calendar_today,
                         onTap: _pickDate,
                       ),
@@ -143,18 +150,14 @@ class _AddScreenState extends State<AddScreen> {
                     Expanded(
                       child: _buildPickerField(
                         label: "Time",
-                        value: _formatTime(_selectedTime),
+                        value: _selectedTime != null ? _formatTime(_selectedTime!) : "",
+                        hint: "Select a time",
                         icon: Icons.access_time,
                         onTap: _pickTime,
                       ),
                     ),
                   ],
                 ),
-                if (_type == ItemType.exam)
-                  _buildField("Location", _locationController,
-                      hint: "e.g. Exam Hall B"),
-                _buildField("Brief Notes", _descController,
-                    isLong: true, hint: "Add some notes..."),
                 const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: () {
@@ -175,6 +178,14 @@ class _AddScreenState extends State<AddScreen> {
                           "Please enter a location for exams.");
                       return;
                     }
+                    if (_selectedDate == null) {
+                      _showMessage("Please select a due date.");
+                      return;
+                    }
+                    if (_selectedTime == null) {
+                      _showMessage("Please select a time.");
+                      return;
+                    }
 
                     widget.onAdd(
                       PlazoItem(
@@ -182,8 +193,8 @@ class _AddScreenState extends State<AddScreen> {
                         type: _type,
                         title: title,
                         subject: subject,
-                        date: _formatDate(_selectedDate),
-                        time: _formatTime(_selectedTime),
+                        date: _formatDate(_selectedDate!),
+                        time: _formatTime(_selectedTime!),
                         description: _descController.text.trim(),
                         location:
                             _type == ItemType.exam ? location : null,
@@ -223,7 +234,7 @@ class _AddScreenState extends State<AddScreen> {
                 const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
               color: active
-                  ? Colors.white
+                  ? AppColors.getCardBackgroundColor(context)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
             ),
@@ -234,7 +245,7 @@ class _AddScreenState extends State<AddScreen> {
                   fontWeight: FontWeight.w900,
                   color: active
                       ? AppColors.primary
-                      : Colors.grey,
+                      : AppColors.getSecondaryTextColor(context),
                 ),
               ),
             ),
@@ -255,10 +266,10 @@ class _AddScreenState extends State<AddScreen> {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
-              color: Colors.grey,
+              color: AppColors.getSecondaryTextColor(context),
             ),
           ),
           const SizedBox(height: 8),
@@ -267,7 +278,7 @@ class _AddScreenState extends State<AddScreen> {
             maxLines: isLong ? 4 : 1,
             decoration: InputDecoration(
               filled: true,
-              fillColor: AppColors.bgInput,
+              fillColor: AppColors.getInputBackgroundColor(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
@@ -286,6 +297,7 @@ class _AddScreenState extends State<AddScreen> {
   Widget _buildPickerField({
     required String label,
     required String value,
+    required String hint,
     required IconData icon,
     required VoidCallback onTap,
   }) {
@@ -297,10 +309,10 @@ class _AddScreenState extends State<AddScreen> {
         children: [
           Text(
             label.toUpperCase(),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w900,
-              color: Colors.grey,
+              color: AppColors.getSecondaryTextColor(context),
             ),
           ),
           const SizedBox(height: 8),
@@ -314,7 +326,7 @@ class _AddScreenState extends State<AddScreen> {
                       horizontal: 16,
                       vertical: 16),
               decoration: BoxDecoration(
-                color: AppColors.bgInput,
+                color: AppColors.getInputBackgroundColor(context),
                 borderRadius:
                     BorderRadius.circular(20),
               ),
@@ -322,15 +334,15 @@ class _AddScreenState extends State<AddScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      value,
-                      style: const TextStyle(
-                          fontWeight:
-                              FontWeight.w700),
+                      value.isNotEmpty ? value : hint,
+                      style: TextStyle(
+                          fontWeight: value.isNotEmpty ? FontWeight.w700 : FontWeight.w500,
+                          color: value.isNotEmpty ? AppColors.getTextColor(context) : AppColors.getSecondaryTextColor(context)),
                     ),
                   ),
                   Icon(icon,
                       size: 18,
-                      color: Colors.grey[500]),
+                      color: AppColors.getSecondaryTextColor(context)),
                 ],
               ),
             ),

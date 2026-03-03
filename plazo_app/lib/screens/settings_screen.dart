@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
@@ -32,6 +34,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
   bool _isEditing = false;
+  String? _selectedImagePath;
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
@@ -42,6 +45,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _nameController = TextEditingController(text: _user.name);
     _emailController = TextEditingController(text: _user.email);
     _passwordController = TextEditingController();
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (image != null) {
+      setState(() {
+        _selectedImagePath = image.path;
+      });
+    }
   }
 
   @override
@@ -58,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _user = UserProfile(
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
-          avatarUrl: _user.avatarUrl,
+          avatarUrl: _selectedImagePath ?? _user.avatarUrl,
         );
         _isEditing = false;
       });
@@ -68,25 +82,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildAvatar() {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: AppColors.avatarOrange,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Stack(
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.avatarOrange,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: _selectedImagePath != null
+                ? ClipOval(
+                    child: Image.file(
+                      File(_selectedImagePath!),
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Center(
+                    child: Text(
+                      "🧑",
+                      style: TextStyle(fontSize: 60),
+                    ),
+                  ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
           ),
         ],
-      ),
-      child: const Center(
-        child: Text(
-          "🧑",
-          style: TextStyle(fontSize: 60),
-        ),
       ),
     );
   }
@@ -100,7 +152,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         elevation: 0,
         title: Text(
           _t('profile'),
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black),
+          style: TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+            color: AppColors.getTextColor(context),
+          ),
         ),
         centerTitle: false,
         actions: [
@@ -140,8 +196,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _buildAvatar(),
                     const SizedBox(height: 16),
-                    Text(_user.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-                    Text(_user.email.split('@')[0], style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    Text(
+                      _user.name,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.getTextColor(context),
+                      ),
+                    ),
+                    Text(
+                      _user.email,
+                      style: TextStyle(
+                        color: AppColors.getSecondaryTextColor(context),
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -158,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ElevatedButton(
                 onPressed: widget.onLogout,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.getCardBackgroundColor(context),
                   foregroundColor: Colors.redAccent,
                   elevation: 0,
                   side: const BorderSide(color: Colors.redAccent, width: 1.5),
@@ -193,11 +262,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (isAccountSecurity)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Icon(Icons.person, size: 16, color: Colors.grey),
+              child: Icon(
+                Icons.person,
+                size: 16,
+                color: AppColors.getSecondaryTextColor(context),
+              ),
             ),
           Text(
             title,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              color: AppColors.getSecondaryTextColor(context),
+            ),
           ),
         ],
       ),
@@ -215,7 +292,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.getSecondaryTextColor(context),
+              ),
+            ),
             const SizedBox(height: 8),
             if (_isEditing && isEditable)
               TextField(
@@ -223,28 +307,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 obscureText: isPassword,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.bgInput,
+                  fillColor: AppColors.getInputBackgroundColor(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   hintText: isPassword ? "••••••••" : null,
-                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  hintStyle: TextStyle(
+                    color: AppColors.getSecondaryTextColor(context),
+                    fontSize: 13,
+                  ),
                 ),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.getTextColor(context),
+                ),
               )
             else
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.bgInput,
+                  color: AppColors.getInputBackgroundColor(context),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
                   isPassword ? "•••" : controller.text,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: AppColors.getTextColor(context),
+                  ),
                 ),
               ),
           ],
@@ -256,7 +351,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_t('language'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey)),
+            Text(
+              _t('language'),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.getSecondaryTextColor(context),
+              ),
+            ),
             const SizedBox(height: 8),
             Material(
               color: Colors.transparent,
@@ -264,6 +366,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   showModalBottomSheet(
                     context: context,
+                    backgroundColor: AppColors.getCardBackgroundColor(context),
                     shape: const RoundedRectangleBorder(
                       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                     ),
@@ -272,7 +375,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Text(_t('selectLanguage'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                          child: Text(
+                            _t('selectLanguage'),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.getTextColor(context),
+                            ),
+                          ),
                         ),
                         ListTile(
                           title: const Text("English"),
@@ -298,7 +408,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.bgInput,
+                    color: AppColors.getInputBackgroundColor(context),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -308,10 +418,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Expanded(
                         child: Text(
                           widget.language == 'en' ? _t('english') : _t('thai'),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.getTextColor(context)),
                         ),
                       ),
-                      const Icon(Icons.chevron_right, color: Colors.grey),
+                      Icon(Icons.chevron_right, color: AppColors.getSecondaryTextColor(context)),
                     ],
                   ),
                 ),
@@ -326,12 +436,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_t('darkTheme'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.grey)),
+            Text(_t('darkTheme'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.getSecondaryTextColor(context))),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: AppColors.bgInput,
+                color: AppColors.getInputBackgroundColor(context),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
@@ -341,7 +451,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: Colors.amber,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(_t('darkMode'), style: const TextStyle(fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(_t('darkMode'), style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.getTextColor(context)))),
                   Transform.scale(
                     scale: 0.8,
                     child: Switch(
