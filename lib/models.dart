@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 enum ItemType { task, exam }
 
 class PlazoItem {
@@ -28,6 +30,12 @@ class UserProfile {
   String name;
   String email;
   String avatarUrl;
+  Uint8List? avatarBytes;
 
-  UserProfile({required this.name, required this.email, required this.avatarUrl});
+  UserProfile({
+    required this.name,
+    required this.email,
+    required this.avatarUrl,
+    this.avatarBytes,
+  });
 }

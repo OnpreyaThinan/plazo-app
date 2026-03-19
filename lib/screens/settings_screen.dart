@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:typed_data';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
@@ -13,6 +13,7 @@ class SettingsScreen extends StatefulWidget {
   final Function(String) onLanguageChange;
   final Function(bool) onDarkModeChange;
   final VoidCallback onLogout;
+  final Function(UserProfile) onUserChanged;
 
   const SettingsScreen({
     super.key,
@@ -22,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onLanguageChange,
     required this.onDarkModeChange,
     required this.onLogout,
+    required this.onUserChanged,
   });
 
   @override
@@ -35,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _passwordController;
   bool _isEditing = false;
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
@@ -50,11 +53,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
         _selectedImagePath = image.path;
+        _selectedImageBytes = bytes;
+        _user = UserProfile(
+          name: _user.name,
+          email: _user.email,
+          avatarUrl: image.path,
+          avatarBytes: bytes,
+        );
       });
+      widget.onUserChanged(_user);
     }
   }
 
@@ -73,7 +85,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           name: _nameController.text.trim(),
           email: _emailController.text.trim(),
           avatarUrl: _selectedImagePath ?? _user.avatarUrl,
+          avatarBytes: _selectedImageBytes ?? _user.avatarBytes,
         );
+        widget.onUserChanged(_user);
         _isEditing = false;
       });
     } else {
@@ -100,19 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            child: _selectedImagePath != null
-                ? ClipOval(
-                    child: Image.file(
-                      File(_selectedImagePath!),
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : const Center(
-                    child: Text(
-                      "🧑",
-                      style: TextStyle(fontSize: 60),
-                    ),
-                  ),
+            child: ClipOval(child: _buildAvatarImage()),
           ),
           Positioned(
             bottom: 0,
@@ -139,6 +141,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    if (_selectedImageBytes != null) {
+      return Image.memory(
+        _selectedImageBytes!,
+        fit: BoxFit.cover,
+        width: 100,
+        height: 100,
+      );
+    }
+
+    if (_user.avatarBytes != null) {
+      return Image.memory(
+        _user.avatarBytes!,
+        fit: BoxFit.cover,
+        width: 100,
+        height: 100,
+      );
+    }
+
+    if (_user.avatarUrl.startsWith('http')) {
+      return Image.network(
+        _user.avatarUrl,
+        fit: BoxFit.cover,
+        width: 100,
+        height: 100,
+        errorBuilder: (context, error, stackTrace) => _defaultAvatarIcon(60),
+      );
+    }
+
+    return _defaultAvatarIcon(60);
+  }
+
+  Widget _defaultAvatarIcon(double size) {
+    return Center(
+      child: Text(
+        "🧑",
+        style: TextStyle(fontSize: size),
       ),
     );
   }
@@ -385,7 +428,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         ListTile(
-                          title: const Text("English"),
+                          title: Text(
+                            "English",
+                            style: TextStyle(
+                              color: AppColors.getTextColor(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           onTap: () {
                             widget.onLanguageChange('en');
                             Navigator.pop(context);
@@ -393,7 +442,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           trailing: widget.language == 'en' ? const Icon(Icons.check, color: Colors.purple) : null,
                         ),
                         ListTile(
-                          title: const Text("ไทย"),
+                          title: Text(
+                            "ไทย",
+                            style: TextStyle(
+                              color: AppColors.getTextColor(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           onTap: () {
                             widget.onLanguageChange('th');
                             Navigator.pop(context);

@@ -32,6 +32,7 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  late UserProfile _user;
   final List<PlazoItem> _items = [
     PlazoItem(
       id: '1',
@@ -60,6 +61,12 @@ class _MainNavigationState extends State<MainNavigation> {
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+  }
+
   void _onDetail(String id) {
     final item = _items.firstWhere((it) => it.id == id);
     Navigator.push(
@@ -82,8 +89,9 @@ class _MainNavigationState extends State<MainNavigation> {
     final List<Widget> screens = [
       HomeScreen(
         items: _items,
-        userName: widget.user.name,
-        avatarUrl: widget.user.avatarUrl,
+        userName: _user.name,
+        avatarUrl: _user.avatarUrl,
+        avatarBytes: _user.avatarBytes,
         onDetail: _onDetail,
         onNavigateToProfile: () => setState(() => _currentIndex = 3),
       ),
@@ -95,12 +103,15 @@ class _MainNavigationState extends State<MainNavigation> {
         }),
       ),
       SettingsScreen(
-        user: widget.user,
+        user: _user,
         language: widget.language,
         darkMode: widget.darkMode,
         onLanguageChange: widget.onLanguageChange,
         onDarkModeChange: widget.onDarkModeChange,
         onLogout: widget.onLogout,
+        onUserChanged: (updatedUser) {
+          setState(() => _user = updatedUser);
+        },
       ),
     ];
 

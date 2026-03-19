@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:typed_data';
 
 import '../app_colors.dart';
 import '../item_card.dart';
@@ -9,6 +10,7 @@ class HomeScreen extends StatefulWidget {
   final List<PlazoItem> items;
   final String userName;
   final String avatarUrl;
+  final Uint8List? avatarBytes;
   final Function(String) onDetail;
   final VoidCallback? onNavigateToProfile;
 
@@ -17,6 +19,7 @@ class HomeScreen extends StatefulWidget {
     required this.items,
     required this.userName,
     required this.avatarUrl,
+    this.avatarBytes,
     required this.onDetail,
     this.onNavigateToProfile,
   });
@@ -121,13 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             .withOpacity(0.3),
                         shape: BoxShape.circle,
                       ),
-                      child: const Center(
-                        child: Text(
-                          "🧑",
-                          style:
-                              TextStyle(fontSize: 24),
-                        ),
-                      ),
+                      child: ClipOval(child: _buildAvatarImage()),
                     ),
                   ),
                 ],
@@ -251,6 +248,38 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    if (widget.avatarBytes != null) {
+      return Image.memory(
+        widget.avatarBytes!,
+        fit: BoxFit.cover,
+        width: 44,
+        height: 44,
+      );
+    }
+
+    if (widget.avatarUrl.startsWith('http')) {
+      return Image.network(
+        widget.avatarUrl,
+        fit: BoxFit.cover,
+        width: 44,
+        height: 44,
+        errorBuilder: (context, error, stackTrace) => _defaultAvatarIcon(24),
+      );
+    }
+
+    return _defaultAvatarIcon(24);
+  }
+
+  Widget _defaultAvatarIcon(double size) {
+    return Center(
+      child: Text(
+        "🧑",
+        style: TextStyle(fontSize: size),
       ),
     );
   }
