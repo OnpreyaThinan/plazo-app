@@ -67,6 +67,12 @@ class _MainNavigationState extends State<MainNavigation> {
     _user = widget.user;
   }
 
+  @override
+  void didUpdateWidget(covariant MainNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _user = widget.user;
+  }
+
   void _onDetail(String id) {
     final item = _items.firstWhere((it) => it.id == id);
     Navigator.push(

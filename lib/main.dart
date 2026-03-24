@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'firebase_options.dart';
@@ -7,6 +8,7 @@ import 'app_colors.dart';
 import 'models.dart';
 import 'navigation_wrapper.dart';
 import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +26,7 @@ class PlazoApp extends StatefulWidget {
 }
 
 class _PlazoAppState extends State<PlazoApp> {
-  UserProfile? _currentUser;
+  final _authService = AuthService();
   String _language = 'en';
   bool _darkMode = false;
 
@@ -34,6 +36,37 @@ class _PlazoAppState extends State<PlazoApp> {
 
   void _toggleDarkMode(bool value) {
     setState(() => _darkMode = value);
+  }
+
+  UserProfile _createUserProfile(User firebaseUser) {
+    final providerPhotoUrl = firebaseUser.providerData
+        .map((p) => p.photoURL)
+        .whereType<String>()
+        .cast<String?>()
+        .firstWhere((url) => url != null && url.isNotEmpty, orElse: () => null);
+
+    final rawAvatarUrl = firebaseUser.photoURL ??
+        providerPhotoUrl ??
+        "https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.displayName ?? firebaseUser.email}";
+
+    String avatarUrl = rawAvatarUrl;
+    if (rawAvatarUrl.startsWith('http')) {
+      final uri = Uri.parse(rawAvatarUrl);
+      avatarUrl = uri
+          .replace(
+            queryParameters: {
+              ...uri.queryParameters,
+              'v': firebaseUser.uid,
+            },
+          )
+          .toString();
+    }
+
+    return UserProfile(
+      name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? 'User',
+      email: firebaseUser.email ?? '',
+      avatarUrl: avatarUrl,
+    );
   }
 
   ThemeData _buildTheme(bool isDark) {
@@ -78,25 +111,46 @@ class _PlazoAppState extends State<PlazoApp> {
       theme: _buildTheme(false),
       darkTheme: _buildTheme(true),
       themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
-      home: _currentUser == null
-          ? LoginScreen(
-              onLogin: (name, email) => setState(() {
-                _currentUser = UserProfile(
-                  name: name,
-                  email: email,
-                  avatarUrl:
-                      "https://api.dicebear.com/7.x/avataaars/svg?seed=$name",
-                );
-              }),
-            )
-          : MainNavigation(
-              user: _currentUser!,
+      home: StreamBuilder<User?>(
+        stream: _authService.authStateChanges,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+            );
+          }
+
+          User? firebaseUser = snapshot.data;
+
+          if (firebaseUser != null) {
+            // User is logged in
+            UserProfile currentUser = _createUserProfile(firebaseUser);
+            return MainNavigation(
+              key: ValueKey(firebaseUser.uid),
+              user: currentUser,
               language: _language,
               onLanguageChange: _changeLanguage,
               darkMode: _darkMode,
               onDarkModeChange: _toggleDarkMode,
-              onLogout: () => setState(() => _currentUser = null),
-            ),
+              onLogout: () async {
+                await _authService.signOut();
+              },
+            );
+          } else {
+            // User is not logged in
+            return LoginScreen(
+              onLogin: (name, email) {
+                // This is called after successful login
+                // The StreamBuilder will rebuild when Firebase auth state changes
+              },
+            );
+          }
+        },
+      ),
     );
   }
 }

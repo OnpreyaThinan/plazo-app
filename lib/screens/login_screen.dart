@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../app_colors.dart';
+import '../services/auth_service.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  final Function(String name, String email) onLogin;
-  const LoginScreen({super.key, required this.onLogin});
+  final Function(String name, String email)? onLogin;
+  const LoginScreen({super.key, this.onLogin});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -14,9 +16,11 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
+  final _authService = AuthService();
   bool _obscurePassword = true;
   bool _isFormValid = false;
   bool _attemptedSubmit = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -98,33 +102,50 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (resetEmailController.text.isNotEmpty && 
                   _isValidEmail(resetEmailController.text)) {
-                Navigator.pop(context);
-                
-                // Show success message
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            "Password reset link has been sent to ${resetEmailController.text}",
+                try {
+                  await _authService.sendPasswordResetEmail(
+                    email: resetEmailController.text,
+                  );
+                  Navigator.pop(context);
+                  
+                  // Show success message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              "Password reset link has been sent to ${resetEmailController.text}",
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      backgroundColor: AppColors.primary,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      duration: const Duration(seconds: 4),
                     ),
-                    backgroundColor: AppColors.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                  );
+                } on FirebaseAuthException catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.message ?? "Failed to send reset email"),
+                      backgroundColor: Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
+                  );
+                }
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -155,6 +176,121 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleSignIn() async {
+    setState(() {
+      _attemptedSubmit = true;
+    });
+
+    if (!_isFormValid) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      User? user = await _authService.signIn(
+        email: _emailController.text,
+        password: _passController.text,
+      );
+
+      if (user != null && mounted) {
+        // Call the optional callback if provided
+        if (widget.onLogin != null) {
+          widget.onLogin!(
+            user.displayName ?? _emailController.text.split('@')[0],
+            user.email ?? _emailController.text,
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String errorMessage = "Sign in failed";
+        if (e.code == 'user-not-found') {
+          errorMessage = "No account found with this email";
+        } else if (e.code == 'wrong-password') {
+          errorMessage = "Incorrect password";
+        } else if (e.code == 'invalid-email') {
+          errorMessage = "Invalid email address";
+        } else if (e.code == 'user-disabled') {
+          errorMessage = "This account has been disabled";
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      User? user = await _authService.signInWithGoogle();
+
+      if (user != null && mounted) {
+        // Call the optional callback if provided
+        if (widget.onLogin != null) {
+          widget.onLogin!(
+            user.displayName ?? user.email?.split('@')[0] ?? 'User',
+            user.email ?? '',
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String errorMessage = e.message ?? "Google sign-in failed";
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Google sign-in cancelled"),
+            backgroundColor: Colors.grey,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -228,17 +364,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
               ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    _attemptedSubmit = true;
-                  });
-                  if (_isFormValid) {
-                    widget.onLogin(
-                      _emailController.text.split('@')[0],
-                      _emailController.text,
-                    );
-                  }
-                },
+                onPressed: _isLoading ? null : _handleSignIn,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   minimumSize: const Size(double.infinity, 60),
@@ -246,10 +372,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   elevation: 5,
                   shadowColor: AppColors.primary.withOpacity(0.4),
                 ),
-                child: const Text(
-                  "Sign In",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        "Sign In",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
               ),
               const SizedBox(height: 30),
               Row(
@@ -274,6 +409,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   context,
                   "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
                   "Google sign-in",
+                  onTap: _handleGoogleSignIn,
                 ),
               ),
               const SizedBox(height: 30),
@@ -414,6 +550,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildInput(
     String label,
     String hint,
@@ -446,16 +583,17 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _socialButton(BuildContext context, String iconUrl, String label) {
+  Widget _socialButton(
+    BuildContext context,
+    String iconUrl,
+    String label, {
+    required VoidCallback onTap,
+  }) {
     return Semantics(
       button: true,
       label: label,
       child: GestureDetector(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Social login coming soon.")),
-          );
-        },
+        onTap: onTap,
         child: Container(
           width: 56,
           height: 56,

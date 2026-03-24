@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../app_colors.dart';
+import '../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
-  final Function(String name, String email) onSignUp;
-  const SignUpScreen({super.key, required this.onSignUp});
+  final Function(String name, String email)? onSignUp;
+  const SignUpScreen({super.key, this.onSignUp});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -15,10 +17,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passController = TextEditingController();
   final _confirmPassController = TextEditingController();
+  final _authService = AuthService();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isFormValid = false;
   bool _attemptedSubmit = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -52,6 +56,67 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       _passController.text.length >= 8 &&
                       _passController.text == _confirmPassController.text;
     });
+  }
+
+  Future<void> _handleSignUp() async {
+    setState(() {
+      _attemptedSubmit = true;
+    });
+
+    if (!_isFormValid) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      User? user = await _authService.signUp(
+        email: _emailController.text,
+        password: _passController.text,
+        name: _nameController.text,
+      );
+
+      if (user != null && mounted) {
+        // Call the optional callback if provided
+        if (widget.onSignUp != null) {
+          widget.onSignUp!(
+            _nameController.text,
+            _emailController.text,
+          );
+        }
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        String errorMessage = "Sign up failed";
+        if (e.code == 'weak-password') {
+          errorMessage = "Password is too weak";
+        } else if (e.code == 'email-already-in-use') {
+          errorMessage = "Email is already in use";
+        } else if (e.code == 'invalid-email') {
+          errorMessage = "Invalid email address";
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -127,18 +192,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       _buildConfirmPasswordInput(),
                       const SizedBox(height: 40),
                       ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _attemptedSubmit = true;
-                          });
-                          if (_isFormValid) {
-                            widget.onSignUp(
-                              _nameController.text,
-                              _emailController.text,
-                            );
-                            Navigator.pop(context);
-                          }
-                        },
+                        onPressed: _isLoading ? null : _handleSignUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           minimumSize: const Size(double.infinity, 60),
@@ -146,10 +200,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           elevation: 5,
                           shadowColor: AppColors.primary.withOpacity(0.4),
                         ),
-                        child: const Text(
-                          "Create Account",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                "Create Account",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
                       ),
                       const SizedBox(height: 30),
                       Row(
