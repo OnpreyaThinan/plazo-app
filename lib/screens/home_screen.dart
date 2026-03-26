@@ -39,10 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _currentStartDate = _today.subtract(const Duration(days: 2));
   }
 
-  int _getWeekOfMonth(DateTime date) {
-    return ((date.day - 1) ~/ 7) + 1;
-  }
-
   String _getMonthName(DateTime date) {
     return DateFormat('MMMM').format(date);
   }
@@ -51,17 +47,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateFormat('EEE').format(date).toUpperCase();
   }
 
-  void _prevWeek() {
+  void _shiftDays(int dayCount) {
     setState(() {
       _currentStartDate =
-          _currentStartDate.subtract(const Duration(days: 5));
-    });
-  }
-
-  void _nextWeek() {
-    setState(() {
-      _currentStartDate =
-          _currentStartDate.add(const Duration(days: 5));
+          _currentStartDate.add(Duration(days: dayCount));
     });
   }
 
@@ -75,11 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
         pending.where((i) => i.type == ItemType.exam).toList();
 
     final displayMonth = _getMonthName(_currentStartDate);
-    final weekNum = _getWeekOfMonth(_currentStartDate);
-    final dates = List.generate(
-      5,
-      (i) => _currentStartDate.add(Duration(days: i)),
-    );
 
     return Container(
       decoration: BoxDecoration(
@@ -90,18 +74,21 @@ class _HomeScreenState extends State<HomeScreen> {
             AppColors.primary.withOpacity(0.08),
             AppColors.accentBlue.withOpacity(0.08),
             Theme.of(context).brightness == Brightness.dark 
-              ? Colors.grey[900]! 
-              : Colors.white,
+              ? Colors.grey[900]!
+              : const Color(0xFFF2FAF7),
           ],
           stops: const [0.0, 0.5, 1.0],
         ),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               /// Greeting Row
               Row(
                 mainAxisAlignment:
@@ -132,84 +119,82 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 30),
 
-              /// Month + Week
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    displayMonth,
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary
-                          .withOpacity(0.1),
-                      borderRadius:
-                          BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      "WEEK $weekNum",
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
+              /// Month
+              Text(
+                displayMonth,
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
 
               const SizedBox(height: 20),
 
-              /// Week Navigator
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
-                children: [
-                  InkWell(
-                    onTap: _prevWeek,
-                    child: _arrowButton(
-                        Icons.chevron_left),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection:
-                          Axis.horizontal,
-                      child: Row(
-                        children:
-                            dates.map((date) {
-                          final isToday =
-                              date.day ==
-                                      _today.day &&
-                                  date.month ==
-                                      _today.month &&
-                                  date.year ==
-                                      _today.year;
+              /// Responsive week navigator
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const arrowButtonWidth = 36.0;
+                  const spaceAfterLeftArrow = 12.0;
+                  const spaceBeforeRightArrow = 12.0;
+                  const cardGap = 12.0;
+                  const preferredCardWidth = 70.0;
+                  const minimumDays = 3;
 
-                          return _dateCard(
-                            date.day.toString(),
-                            _getDayName(date),
-                            isToday,
-                          );
-                        }).toList(),
+                  final availableForCards = constraints.maxWidth -
+                      (arrowButtonWidth * 2) -
+                      spaceAfterLeftArrow -
+                      spaceBeforeRightArrow;
+
+                  final rawCount =
+                      ((availableForCards + cardGap) / (preferredCardWidth + cardGap))
+                          .floor();
+                  final visibleDayCount = rawCount < minimumDays ? minimumDays : rawCount;
+
+                  final totalGap = cardGap * (visibleDayCount - 1);
+                  final cardWidth =
+                      (availableForCards - totalGap) / visibleDayCount;
+
+                  final dates = List.generate(
+                    visibleDayCount,
+                    (i) => _currentStartDate.add(Duration(days: i)),
+                  );
+
+                  return Row(
+                    children: [
+                      InkWell(
+                        onTap: () => _shiftDays(-visibleDayCount),
+                        child: _arrowButton(Icons.chevron_left),
                       ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: _nextWeek,
-                    child: _arrowButton(
-                        Icons.chevron_right),
-                  ),
-                ],
+                      const SizedBox(width: spaceAfterLeftArrow),
+                      Expanded(
+                        child: Row(
+                          children: dates.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final date = entry.value;
+                            final isToday =
+                                date.day == _today.day &&
+                                    date.month == _today.month &&
+                                    date.year == _today.year;
+
+                            return _dateCard(
+                              day: date.day.toString(),
+                              label: _getDayName(date),
+                              active: isToday,
+                              width: cardWidth,
+                              isLast: index == dates.length - 1,
+                              gap: cardGap,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(width: spaceBeforeRightArrow),
+                      InkWell(
+                        onTap: () => _shiftDays(visibleDayCount),
+                        child: _arrowButton(Icons.chevron_right),
+                      ),
+                    ],
+                  );
+                },
               ),
 
               const SizedBox(height: 40),
@@ -244,8 +229,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              const SizedBox(height: 100),
-            ],
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -302,13 +289,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _dateCard(
-      String day, String label, bool active) {
+  Widget _dateCard({
+    required String day,
+    required String label,
+    required bool active,
+    required double width,
+    required bool isLast,
+    required double gap,
+  }) {
     return Container(
-      width: 70,
+      width: width,
       height: 90,
-      margin:
-          const EdgeInsets.only(right: 16),
+      margin: EdgeInsets.only(right: isLast ? 0 : gap),
       decoration: BoxDecoration(
         color: active
             ? AppColors.primary

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:typed_data';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
 import '../models.dart';
+import '../services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final UserProfile user;
@@ -34,10 +36,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late UserProfile _user;
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late TextEditingController _passwordController;
   bool _isEditing = false;
   String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
+  final _authService = AuthService();
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
@@ -47,7 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _user = widget.user;
     _nameController = TextEditingController(text: _user.name);
     _emailController = TextEditingController(text: _user.email);
-    _passwordController = TextEditingController();
   }
 
   Future<void> _pickImage() async {
@@ -74,8 +75,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showChangePasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          "Change Password",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "We'll send a password reset link to your email address.",
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                _user.email,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              "Cancel",
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(context),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _authService.sendPasswordResetEmail(
+                  email: _user.email,
+                );
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.white),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "Password reset link has been sent to ${_user.email}",
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: AppColors.primary,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+
+                // Auto-logout after showing message
+                await Future.delayed(const Duration(seconds: 2));
+                if (mounted) {
+                  widget.onLogout();
+                }
+              } on FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.message ?? "Failed to send reset email"),
+                    backgroundColor: Colors.redAccent,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "Send Link",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _toggleEditMode() {
@@ -261,7 +377,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSectionTitle(_t('accountSecurity')),
               _buildInfoField(_t('name'), _nameController, isEditable: true),
               _buildInfoField(_t('email'), _emailController, isEditable: true),
-              _buildInfoField(_t('password'), _passwordController, isEditable: _isEditing, isPassword: true),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: _showChangePasswordDialog,
+                  child: Text(
+                    "Change Password?",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 32),
               _buildSectionTitle(_t('preferences')),
               _buildLanguageSelector(),
@@ -328,7 +457,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String label,
     TextEditingController controller, {
     bool isEditable = false,
-    bool isPassword = false,
   }) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
@@ -347,7 +475,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_isEditing && isEditable)
               TextField(
                 controller: controller,
-                obscureText: isPassword,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: AppColors.getInputBackgroundColor(context),
@@ -356,7 +483,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  hintText: isPassword ? "••••••••" : null,
                   hintStyle: TextStyle(
                     color: AppColors.getSecondaryTextColor(context),
                     fontSize: 13,
@@ -377,7 +503,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  isPassword ? "•••" : controller.text,
+                  controller.text,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,

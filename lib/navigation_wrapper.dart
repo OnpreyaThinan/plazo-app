@@ -33,33 +33,7 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   late UserProfile _user;
-  final List<PlazoItem> _items = [
-    PlazoItem(
-      id: '1',
-      type: ItemType.task,
-      title: 'Calculus Exercises',
-      subject: 'Mathematics',
-      date: '10/04/2025',
-      time: '09:00',
-    ),
-    PlazoItem(
-      id: '2',
-      type: ItemType.task,
-      title: 'Physics Report',
-      subject: 'Physics Lab',
-      date: '12/04/2025',
-      time: '14:00',
-    ),
-    PlazoItem(
-      id: '4',
-      type: ItemType.exam,
-      title: 'Midterm Quiz',
-      subject: 'Economics',
-      date: '11/04/2025',
-      time: '08:00',
-      location: 'Hall A, Room 202',
-    ),
-  ];
+  final List<PlazoItem> _items = [];
 
   @override
   void initState() {
