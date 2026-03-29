@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../item_card.dart';
 import '../models.dart';
 
 class CompletedScreen extends StatelessWidget {
   final List<PlazoItem> items;
+  final String language;
   final Function(String) onDetail;
 
-  const CompletedScreen({super.key, required this.items, required this.onDetail});
+  const CompletedScreen({
+    super.key,
+    required this.items,
+    required this.language,
+    required this.onDetail,
+  });
+
+  String _t(String key) => AppStrings.get(key, language);
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +42,13 @@ class CompletedScreen extends StatelessWidget {
         child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text("Finished", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+          Text(_t('finished'), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
           const SizedBox(height: 20),
           if (completed.isEmpty)
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(top: 100),
-                child: Text("No completed tasks yet", style: TextStyle(color: AppColors.getSecondaryTextColor(context))),
+                child: Text(_t('noCompletedTasksYet'), style: TextStyle(color: AppColors.getSecondaryTextColor(context))),
               ),
             )
           else

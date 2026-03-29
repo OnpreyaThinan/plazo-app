@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../models.dart';
 
 class EditScreen extends StatefulWidget {
   final PlazoItem item;
+  final String language;
   final Function(PlazoItem) onSave;
   final Function(String) onDelete;
 
   const EditScreen({
     super.key,
     required this.item,
+    required this.language,
     required this.onSave,
     required this.onDelete,
   });
@@ -116,21 +119,23 @@ class _EditScreenState extends State<EditScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _t(String key) => AppStrings.get(key, widget.language);
+
   void _save() {
     final subject = _subjectController.text.trim();
     final title = _titleController.text.trim();
     final location = _locationController.text.trim();
 
     if (subject.isEmpty) {
-      _showMessage("Please enter a subject.");
+      _showMessage(_t('pleaseEnterSubject'));
       return;
     }
     if (title.isEmpty) {
-      _showMessage("Please enter an activity.");
+      _showMessage(_t('pleaseEnterActivity'));
       return;
     }
     if (_type == ItemType.exam && location.isEmpty) {
-      _showMessage("Please enter a location for exams.");
+      _showMessage(_t('pleaseEnterExamLocation'));
       return;
     }
 
@@ -160,7 +165,7 @@ class _EditScreenState extends State<EditScreen> {
   @override
   Widget build(BuildContext context) {
     final typeLabel =
-        _type == ItemType.exam ? "EXAMS" : "TASKS";
+        _type == ItemType.exam ? _t('examsUpper') : _t('tasksUpper');
     final typeColor =
         _type == ItemType.exam
             ? AppColors.accentPink
@@ -237,10 +242,10 @@ class _EditScreenState extends State<EditScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _buildField("Subject",
+                _buildField(_t('subject'),
                     _subjectController,
                     outlined: true),
-                _buildField("Activity",
+                _buildField(_t('activity'),
                     _titleController,
                     filled: true),
                 Row(
@@ -269,10 +274,10 @@ class _EditScreenState extends State<EditScreen> {
                   ],
                 ),
                 if (_type == ItemType.exam)
-                  _buildField("Location",
+                  _buildField(_t('location'),
                       _locationController,
                       filled: true),
-                _buildField("Brief Notes",
+                _buildField(_t('briefNotes'),
                     _descController,
                     isLong: true,
                     filled: true),

@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../models.dart';
 import 'edit_screen.dart';
 
 class DetailScreen extends StatefulWidget {
   final PlazoItem item;
+  final String language;
   final Function(PlazoItem) onUpdate;
   final Function(String) onDelete;
 
   const DetailScreen({
     super.key,
     required this.item,
+    required this.language,
     required this.onUpdate,
     required this.onDelete,
   });
@@ -22,6 +25,7 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   late PlazoItem _item;
+  String _t(String key) => AppStrings.get(key, widget.language);
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _DetailScreenState extends State<DetailScreen> {
       MaterialPageRoute(
         builder: (context) => EditScreen(
           item: _item,
+          language: widget.language,
           onSave: widget.onUpdate,
           onDelete: widget.onDelete,
         ),
@@ -124,7 +129,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _item.type == ItemType.exam ? "EXAM" : "TASK",
+                      _item.type == ItemType.exam ? _t('exam') : _t('task'),
                       style: TextStyle(
                         color: _item.type == ItemType.exam
                             ? AppColors.accentPink
@@ -175,7 +180,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   ],
                   const SizedBox(height: 24),
                   Text(
-                    "BRIEF NOTES",
+                    _t('briefNotes').toUpperCase(),
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w900,
@@ -194,7 +199,7 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                     child: Text(
                       _item.description.isEmpty
-                          ? "No additional notes."
+                          ? _t('noAdditionalNotes')
                           : _item.description,
                       style: TextStyle(
                         height: 1.5,
@@ -226,8 +231,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                     child: Text(
                       _item.isCompleted
-                          ? "Move to Pending"
-                          : "Done",
+                          ? _t('moveToPending')
+                          : _t('done'),
                       style: TextStyle(
                         color: _item.isCompleted
                             ? AppColors

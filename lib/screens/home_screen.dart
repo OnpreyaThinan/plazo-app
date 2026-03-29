@@ -3,11 +3,13 @@ import 'package:intl/intl.dart';
 import 'dart:typed_data';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../item_card.dart';
 import '../models.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<PlazoItem> items;
+  final String language;
   final String userName;
   final String avatarUrl;
   final Uint8List? avatarBytes;
@@ -17,6 +19,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.items,
+    required this.language,
     required this.userName,
     required this.avatarUrl,
     this.avatarBytes,
@@ -40,12 +43,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getMonthName(DateTime date) {
-    return DateFormat('MMMM').format(date);
+    return DateFormat('MMMM', widget.language).format(date);
   }
 
   String _getDayName(DateTime date) {
-    return DateFormat('EEE').format(date).toUpperCase();
+    return DateFormat('EEE', widget.language).format(date).toUpperCase();
   }
+
+  String _t(String key) => AppStrings.get(key, widget.language);
 
   void _shiftDays(int dayCount) {
     setState(() {
@@ -95,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Hi, ${widget.userName}",
+                    "${_t('hi')}, ${widget.userName}",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -201,8 +206,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
               /// Tasks
               _sectionHeader(
-                "Tasks",
-                "${tasks.length} PENDING",
+                _t('tasks'),
+                "${tasks.length} ${_t('pending')}",
                 AppColors.accentBlue,
               ),
               ...tasks.map(
@@ -217,8 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
               /// Exams
               _sectionHeader(
-                "Exams",
-                "${exams.length} UPCOMING",
+                _t('exams'),
+                "${exams.length} ${_t('upcoming')}",
                 AppColors.accentPink,
               ),
               ...exams.map(

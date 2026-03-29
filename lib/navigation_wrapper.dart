@@ -54,6 +54,7 @@ class _MainNavigationState extends State<MainNavigation> {
       MaterialPageRoute(
         builder: (context) => DetailScreen(
           item: item,
+          language: widget.language,
           onUpdate: (updated) => setState(() {
             final idx = _items.indexWhere((it) => it.id == updated.id);
             _items[idx] = updated;
@@ -69,14 +70,20 @@ class _MainNavigationState extends State<MainNavigation> {
     final List<Widget> screens = [
       HomeScreen(
         items: _items,
+        language: widget.language,
         userName: _user.name,
         avatarUrl: _user.avatarUrl,
         avatarBytes: _user.avatarBytes,
         onDetail: _onDetail,
         onNavigateToProfile: () => setState(() => _currentIndex = 3),
       ),
-      CompletedScreen(items: _items, onDetail: _onDetail),
+      CompletedScreen(
+        items: _items,
+        language: widget.language,
+        onDetail: _onDetail,
+      ),
       AddScreen(
+        language: widget.language,
         onAdd: (newItem) => setState(() {
           _items.insert(0, newItem);
           _currentIndex = 0;

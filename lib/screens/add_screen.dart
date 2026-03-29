@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../models.dart';
 
 class AddScreen extends StatefulWidget {
+  final String language;
   final Function(PlazoItem) onAdd;
-  const AddScreen({super.key, required this.onAdd});
+  const AddScreen({
+    super.key,
+    required this.language,
+    required this.onAdd,
+  });
 
   @override
   State<AddScreen> createState() => _AddScreenState();
@@ -74,6 +80,8 @@ class _AddScreenState extends State<AddScreen> {
     );
   }
 
+  String _t(String key) => AppStrings.get(key, widget.language);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,9 +106,9 @@ class _AddScreenState extends State<AddScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Add Plan",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
+                Text(
+                  _t('addPlan'),
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 30),
                 Container(
@@ -112,12 +120,12 @@ class _AddScreenState extends State<AddScreen> {
                   child: Row(
                     children: [
                       _toggleButton(
-                        "Tasks",
+                        _t('tasks'),
                         _type == ItemType.task,
                         () => setState(() => _type = ItemType.task),
                       ),
                       _toggleButton(
-                        "Exams",
+                        _t('exams'),
                         _type == ItemType.exam,
                         () => setState(() => _type = ItemType.exam),
                       ),
@@ -125,23 +133,23 @@ class _AddScreenState extends State<AddScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
-                _buildField("Subject", _subjectController,
+                _buildField(_t('subject'), _subjectController,
                     hint: "e.g. Mathematics"),
-                _buildField("Activity", _titleController,
+                _buildField(_t('activity'), _titleController,
                     hint: "e.g. Midterm Prep"),
                 if (_type == ItemType.exam)
-                  _buildField("Location", _locationController,
+                  _buildField(_t('location'), _locationController,
                       hint: "e.g. Exam Hall B"),
-                _buildField("Brief Notes", _descController,
+                _buildField(_t('briefNotes'), _descController,
                     isLong: true, hint: "Add some notes..."),
                 const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
                       child: _buildPickerField(
-                        label: "Due Date",
+                        label: _t('dueDate'),
                         value: _selectedDate != null ? _formatDate(_selectedDate!) : "",
-                        hint: "Select a date",
+                        hint: _t('selectDate'),
                         icon: Icons.calendar_today,
                         onTap: _pickDate,
                       ),
@@ -149,9 +157,9 @@ class _AddScreenState extends State<AddScreen> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: _buildPickerField(
-                        label: "Time",
+                        label: _t('time'),
                         value: _selectedTime != null ? _formatTime(_selectedTime!) : "",
-                        hint: "Select a time",
+                        hint: _t('selectTime'),
                         icon: Icons.access_time,
                         onTap: _pickTime,
                       ),
@@ -166,24 +174,23 @@ class _AddScreenState extends State<AddScreen> {
                     final location = _locationController.text.trim();
 
                     if (subject.isEmpty) {
-                      _showMessage("Please enter a subject.");
+                      _showMessage(_t('pleaseEnterSubject'));
                       return;
                     }
                     if (title.isEmpty) {
-                      _showMessage("Please enter an activity.");
+                      _showMessage(_t('pleaseEnterActivity'));
                       return;
                     }
                     if (_type == ItemType.exam && location.isEmpty) {
-                      _showMessage(
-                          "Please enter a location for exams.");
+                      _showMessage(_t('pleaseEnterExamLocation'));
                       return;
                     }
                     if (_selectedDate == null) {
-                      _showMessage("Please select a due date.");
+                      _showMessage(_t('pleaseSelectDueDate'));
                       return;
                     }
                     if (_selectedTime == null) {
-                      _showMessage("Please select a time.");
+                      _showMessage(_t('pleaseSelectTime'));
                       return;
                     }
 
@@ -209,11 +216,12 @@ class _AddScreenState extends State<AddScreen> {
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  child: const Text(
-                    "Add Plan",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold),
+                  child: Text(
+                    _t('addPlan'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
