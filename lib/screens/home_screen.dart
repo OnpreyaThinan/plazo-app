@@ -76,8 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppColors.primary.withOpacity(0.08),
-            AppColors.accentBlue.withOpacity(0.08),
+            AppColors.primary.withValues(alpha: 0.08),
+            AppColors.accentBlue.withValues(alpha: 0.08),
             Theme.of(context).brightness == Brightness.dark 
               ? Colors.grey[900]!
               : const Color(0xFFF2FAF7),
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       height: 44,
                       decoration: BoxDecoration(
                         color: AppColors.primary
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                         shape: BoxShape.circle,
                       ),
                       child: ClipOval(child: _buildAvatarImage()),
@@ -282,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 36,
       decoration: BoxDecoration(
         color:
-            AppColors.primary.withOpacity(0.1),
+            AppColors.primary.withValues(alpha: 0.1),
         borderRadius:
             BorderRadius.circular(12),
       ),
@@ -340,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   FontWeight.w900,
               color: active
                   ? Colors.white
-                      .withOpacity(0.7)
+                      .withValues(alpha: 0.7)
                   : AppColors.getSecondaryTextColor(context),
             ),
           ),

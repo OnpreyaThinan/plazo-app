@@ -91,8 +91,8 @@ class _AddScreenState extends State<AddScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.08),
-              AppColors.accentBlue.withOpacity(0.08),
+              AppColors.primary.withValues(alpha: 0.08),
+              AppColors.accentBlue.withValues(alpha: 0.08),
               Theme.of(context).brightness == Brightness.dark 
                 ? Colors.grey[900]! 
                 : Colors.white,

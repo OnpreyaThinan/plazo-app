@@ -10,13 +10,16 @@ import 'models.dart';
 import 'navigation_wrapper.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'services/storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  if (!(const bool.fromEnvironment('flutter.test'))) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   runApp(const PlazoApp());
 }
 
@@ -31,13 +34,33 @@ class _PlazoAppState extends State<PlazoApp> {
   final _authService = AuthService();
   String _language = 'en';
   bool _darkMode = false;
+  bool _isReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final language = await StorageService.loadLanguage();
+    final darkMode = await StorageService.loadDarkMode();
+    if (!mounted) return;
+    setState(() {
+      _language = language;
+      _darkMode = darkMode;
+      _isReady = true;
+    });
+  }
 
   void _changeLanguage(String language) {
     setState(() => _language = language);
+    StorageService.saveLanguage(language);
   }
 
   void _toggleDarkMode(bool value) {
     setState(() => _darkMode = value);
+    StorageService.saveDarkMode(value);
   }
 
   UserProfile _createUserProfile(User firebaseUser) {
@@ -82,6 +105,18 @@ class _PlazoAppState extends State<PlazoApp> {
       return baseTheme.copyWith(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.darkBg,
+        dialogTheme: DialogThemeData(
+          backgroundColor: Colors.grey[900],
+          titleTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+          ),
+          contentTextStyle: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+          ),
+        ),
         appBarTheme: const AppBarTheme(
           elevation: 0,
           backgroundColor: Colors.transparent,
@@ -101,12 +136,28 @@ class _PlazoAppState extends State<PlazoApp> {
       );
     }
     return baseTheme.copyWith(
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Colors.white,
+      ),
       appBarTheme: const AppBarTheme(elevation: 0),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_isReady) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
       title: 'Plazo',
       debugShowCheckedModeBanner: false,
@@ -145,6 +196,7 @@ class _PlazoAppState extends State<PlazoApp> {
           } else {
             // User is not logged in
             return LoginScreen(
+              language: _language,
               onLogin: (name, email) {
                 // This is called after successful login
                 // The StreamBuilder will rebuild when Firebase auth state changes

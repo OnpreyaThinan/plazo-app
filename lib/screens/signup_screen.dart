@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
+  final String language;
   final Function(String name, String email)? onSignUp;
-  const SignUpScreen({super.key, this.onSignUp});
+  const SignUpScreen({super.key, required this.language, this.onSignUp});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -23,6 +25,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isFormValid = false;
   bool _attemptedSubmit = false;
   bool _isLoading = false;
+
+  String _t(String key) => AppStrings.get(key, widget.language);
 
   @override
   void initState() {
@@ -90,13 +94,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String errorMessage = "Sign up failed";
+        String errorMessage = _t('signUpFailed');
         if (e.code == 'weak-password') {
-          errorMessage = "Password is too weak";
+          errorMessage = _t('weakPassword');
         } else if (e.code == 'email-already-in-use') {
-          errorMessage = "Email is already in use";
+          errorMessage = _t('emailAlreadyInUse');
         } else if (e.code == 'invalid-email') {
-          errorMessage = "Invalid email address";
+          errorMessage = _t('invalidEmailAddress');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,8 +132,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.08),
-              AppColors.accentBlue.withOpacity(0.08),
+              AppColors.primary.withValues(alpha: 0.08),
+              AppColors.accentBlue.withValues(alpha: 0.08),
               Colors.white,
             ],
             stops: const [0.0, 0.5, 1.0],
@@ -163,8 +167,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         color: AppColors.primary,
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        "Create Account",
+                      Text(
+                        _t('createAccount'),
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w900,
@@ -174,7 +178,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "Sign up to get started with PLAZO",
+                        _t('signupSubtitle'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppColors.getSecondaryTextColor(context),
@@ -198,7 +202,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           minimumSize: const Size(double.infinity, 60),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                           elevation: 5,
-                          shadowColor: AppColors.primary.withOpacity(0.4),
+                          shadowColor: AppColors.primary.withValues(alpha: 0.4),
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -209,8 +213,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : const Text(
-                                "Create Account",
+                            : Text(
+                              _t('createAccount'),
                                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                               ),
                       ),
@@ -219,7 +223,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Already have an account? ",
+                            _t('alreadyHaveAccountPrompt'),
                             style: TextStyle(
                               color: AppColors.getSecondaryTextColor(context),
                               fontSize: 13,
@@ -227,8 +231,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           ),
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
-                            child: const Text(
-                              "Sign In",
+                            child: Text(
+                              _t('signIn'),
                               style: TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 13,
@@ -253,23 +257,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget _buildNameInput() {
     String? errorText;
     if (_attemptedSubmit && _nameController.text.isEmpty) {
-      errorText = "Please enter your name";
+      errorText = _t('pleaseEnterYourName');
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Full Name",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('fullName'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(
           controller: _nameController,
           decoration: InputDecoration(
-            hintText: "Enter your full name",
+            hintText: _t('enterFullName'),
             hintStyle: TextStyle(
               color: AppColors.getSecondaryTextColor(context),
               fontSize: 14,
@@ -292,27 +296,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String? errorText;
     if (_attemptedSubmit) {
       if (_emailController.text.isEmpty) {
-        errorText = "Please enter email address";
+        errorText = _t('pleaseEnterEmailAddress');
       } else if (!_isValidEmail(_emailController.text)) {
-        errorText = "Please enter a valid email address";
+        errorText = _t('pleaseEnterValidEmailAddress');
       }
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Email Address",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('emailAddress'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
-            hintText: "Enter Email Address",
+            hintText: _t('enterEmailAddress'),
             hintStyle: TextStyle(
               color: AppColors.getSecondaryTextColor(context),
               fontSize: 14,
@@ -335,20 +339,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String? errorText;
     if (_attemptedSubmit) {
       if (_passController.text.isEmpty) {
-        errorText = "Please enter password";
+        errorText = _t('pleaseEnterPassword');
       } else if (_passController.text.length < 8) {
-        errorText = "Password must be at least 8 characters";
+        errorText = _t('passwordMinLength');
       }
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Password",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('password'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(
@@ -389,20 +393,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String? errorText;
     if (_attemptedSubmit) {
       if (_confirmPassController.text.isEmpty) {
-        errorText = "Please confirm your password";
+        errorText = _t('pleaseConfirmPassword');
       } else if (_passController.text != _confirmPassController.text) {
-        errorText = "Passwords do not match";
+        errorText = _t('passwordsDoNotMatch');
       }
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Confirm Password",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('confirmPassword'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(

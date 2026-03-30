@@ -1,16 +1,33 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'storage_service.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  GoogleSignIn? get _googleSignInOrNull => kIsWeb ? null : GoogleSignIn();
+
+  FirebaseAuth? get _authOrNull {
+    if (Firebase.apps.isEmpty) {
+      return null;
+    }
+    return FirebaseAuth.instance;
+  }
+
+  // Save last login timestamp
+  Future<void> _saveLastLogin() async {
+    try {
+      await StorageService.setString('lastLogin', DateTime.now().toIso8601String());
+    } catch (_) {
+      // Ignore failures
+    }
+  }
 
   // Get current user
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser => _authOrNull?.currentUser;
 
   // Stream of user changes, including profile updates like photoURL.
-  Stream<User?> get authStateChanges => _auth.userChanges();
+  Stream<User?> get authStateChanges => _authOrNull?.userChanges() ?? Stream.value(null);
 
   // Sign up with email and password
   Future<User?> signUp({
@@ -18,8 +35,10 @@ class AuthService {
     required String password,
     required String name,
   }) async {
+    final auth = _authOrNull;
+    if (auth == null) return null;
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      UserCredential userCredential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -27,6 +46,9 @@ class AuthService {
       // Update user display name
       await userCredential.user?.updateDisplayName(name);
       await userCredential.user?.reload();
+
+      // Save last login timestamp
+      await _saveLastLogin();
 
       return userCredential.user;
     } on FirebaseAuthException {
@@ -39,11 +61,17 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    final auth = _authOrNull;
+    if (auth == null) return null;
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      UserCredential userCredential = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      // Save last login timestamp
+      await _saveLastLogin();
+      
       return userCredential.user;
     } on FirebaseAuthException {
       rethrow;
@@ -54,8 +82,10 @@ class AuthService {
   Future<void> sendPasswordResetEmail({
     required String email,
   }) async {
+    final auth = _authOrNull;
+    if (auth == null) return;
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException {
       rethrow;
     }
@@ -63,11 +93,16 @@ class AuthService {
 
   // Sign out
   Future<void> signOut() async {
+    final auth = _authOrNull;
+    if (auth == null) return;
+    final googleSignIn = _googleSignInOrNull;
     try {
-      await _auth.signOut();
-      await _googleSignIn.signOut();
-      // Revoke previous Google session so the next login can choose account again.
-      await _googleSignIn.disconnect();
+      await auth.signOut();
+      if (googleSignIn != null) {
+        await googleSignIn.signOut();
+        // Revoke previous Google session so the next login can choose account again.
+        await googleSignIn.disconnect();
+      }
     } on FirebaseAuthException {
       rethrow;
     } catch (_) {
@@ -77,24 +112,31 @@ class AuthService {
 
   // Sign in with Google
   Future<User?> signInWithGoogle() async {
+    final auth = _authOrNull;
+    if (auth == null) return null;
     try {
       if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
         googleProvider.setCustomParameters({'prompt': 'select_account'});
-        final userCredential = await _auth.signInWithPopup(googleProvider);
+        final userCredential = await auth.signInWithPopup(googleProvider);
         await userCredential.user?.reload();
-        return _auth.currentUser;
+        // Save last login timestamp
+        await _saveLastLogin();
+        return auth.currentUser;
       }
+
+      final googleSignIn = _googleSignInOrNull;
+      if (googleSignIn == null) return null;
 
       // Clear previous account session so user can choose a different Google account.
       try {
-        await _googleSignIn.signOut();
-        await _googleSignIn.disconnect();
+        await googleSignIn.signOut();
+        await googleSignIn.disconnect();
       } catch (_) {
         // Ignore if there is no existing Google session.
       }
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       
       if (googleUser == null) {
         return null; // User cancelled
@@ -107,7 +149,7 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      UserCredential userCredential = await auth.signInWithCredential(credential);
 
       if (userCredential.user != null) {
         if ((userCredential.user!.photoURL == null || userCredential.user!.photoURL!.isEmpty) &&
@@ -124,7 +166,33 @@ class AuthService {
       }
 
       await userCredential.user?.reload();
-      return _auth.currentUser;
+      // Save last login timestamp
+      await _saveLastLogin();
+      return auth.currentUser;
+    } on FirebaseAuthException {
+      rethrow;
+    }
+  }
+
+  // Delete user account
+  Future<void> deleteAccount() async {
+    final auth = _authOrNull;
+    final googleSignIn = _googleSignInOrNull;
+    if (auth == null) return;
+    
+    try {
+      // Delete user from Firebase Auth
+      await auth.currentUser?.delete();
+      
+      // Sign out from Google
+      if (googleSignIn != null) {
+        try {
+          await googleSignIn.signOut();
+          await googleSignIn.disconnect();
+        } catch (_) {
+          // Ignore if there's no existing session
+        }
+      }
     } on FirebaseAuthException {
       rethrow;
     }

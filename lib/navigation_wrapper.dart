@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'models.dart';
+import 'services/storage_service.dart';
 import 'screens/add_screen.dart';
 import 'screens/completed_screen.dart';
 import 'screens/detail_screen.dart';
@@ -33,12 +34,27 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
   late UserProfile _user;
-  final List<PlazoItem> _items = [];
+  late List<PlazoItem> _items;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _user = widget.user;
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    final loaded = await StorageService.loadItems();
+    if (!mounted) return;
+    setState(() {
+      _items = loaded;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveItems() async {
+    await StorageService.saveItems(_items);
   }
 
   @override
@@ -58,8 +74,12 @@ class _MainNavigationState extends State<MainNavigation> {
           onUpdate: (updated) => setState(() {
             final idx = _items.indexWhere((it) => it.id == updated.id);
             _items[idx] = updated;
+            _saveItems();
           }),
-          onDelete: (id) => setState(() => _items.removeWhere((it) => it.id == id)),
+          onDelete: (id) => setState(() {
+            _items.removeWhere((it) => it.id == id);
+            _saveItems();
+          }),
         ),
       ),
     );
@@ -67,6 +87,16 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+        ),
+      );
+    }
+
     final List<Widget> screens = [
       HomeScreen(
         items: _items,
@@ -84,10 +114,13 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       AddScreen(
         language: widget.language,
-        onAdd: (newItem) => setState(() {
-          _items.insert(0, newItem);
-          _currentIndex = 0;
-        }),
+        onAdd: (newItem) {
+          setState(() {
+            _items.insert(0, newItem);
+            _currentIndex = 0;
+          });
+          _saveItems();
+        },
       ),
       SettingsScreen(
         user: _user,
@@ -117,7 +150,7 @@ class _MainNavigationState extends State<MainNavigation> {
         borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../app_colors.dart';
+import '../app_strings.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  final String language;
   final Function(String name, String email)? onLogin;
-  const LoginScreen({super.key, this.onLogin});
+  const LoginScreen({super.key, required this.language, this.onLogin});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -21,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isFormValid = false;
   bool _attemptedSubmit = false;
   bool _isLoading = false;
+
+  String _t(String key) => AppStrings.get(key, widget.language);
 
   @override
   void initState() {
@@ -55,20 +59,20 @@ class _LoginScreenState extends State<LoginScreen> {
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        title: const Text(
-          "Reset Password",
+        title: Text(
+          _t('resetPasswordTitle'),
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Enter your email address and we'll send you a link to reset your password.",
+            Text(
+              _t('resetPasswordDescription'),
               style: TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 20),
@@ -76,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: resetEmailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                hintText: "Enter your email",
+                hintText: _t('enterYourEmail'),
                 hintStyle: const TextStyle(fontSize: 14),
                 prefixIcon: const Icon(Icons.email_outlined, color: AppColors.primary),
                 filled: true,
@@ -92,11 +96,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              "Cancel",
+              _t('cancel'),
               style: TextStyle(
-                color: AppColors.getSecondaryTextColor(context),
+                color: AppColors.getSecondaryTextColor(dialogContext),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -109,10 +113,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   await _authService.sendPasswordResetEmail(
                     email: resetEmailController.text,
                   );
-                  Navigator.pop(context);
+                  if (!dialogContext.mounted) return;
+                  Navigator.pop(dialogContext);
+                  if (!dialogContext.mounted) return;
                   
                   // Show success message
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Row(
                         children: [
@@ -120,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              "Password reset link has been sent to ${resetEmailController.text}",
+                              "${_t('resetLinkSent')} ${resetEmailController.text}",
                             ),
                           ),
                         ],
@@ -134,10 +140,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   );
                 } on FirebaseAuthException catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if (!dialogContext.mounted) return;
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
-                      content: Text(e.message ?? "Failed to send reset email"),
+                      content: Text(e.message ?? _t('failedToSendEmail')),
                       backgroundColor: Colors.redAccent,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
@@ -147,9 +153,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
                   SnackBar(
-                    content: const Text("Please enter a valid email address"),
+                    content: Text(_t('pleaseEnterValidEmailAddress')),
                     backgroundColor: Colors.redAccent,
                     behavior: SnackBarBehavior.floating,
                     shape: RoundedRectangleBorder(
@@ -165,8 +171,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: const Text(
-              "Send Link",
+            child: Text(
+              _t('sendLink'),
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -208,15 +214,15 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String errorMessage = "Sign in failed";
+        String errorMessage = _t('signInFailed');
         if (e.code == 'user-not-found') {
-          errorMessage = "No account found with this email";
+          errorMessage = _t('noAccountFound');
         } else if (e.code == 'wrong-password') {
-          errorMessage = "Incorrect password";
+          errorMessage = _t('incorrectPassword');
         } else if (e.code == 'invalid-email') {
-          errorMessage = "Invalid email address";
+          errorMessage = _t('invalidEmailAddress');
         } else if (e.code == 'user-disabled') {
-          errorMessage = "This account has been disabled";
+          errorMessage = _t('accountDisabled');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -258,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String errorMessage = e.message ?? "Google sign-in failed";
+        String errorMessage = e.message ?? _t('googleSignInFailed');
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -275,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("Google sign-in cancelled"),
+            content: Text(_t('googleSignInCancelled')),
             backgroundColor: Colors.grey,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -302,8 +308,8 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.08),
-              AppColors.accentBlue.withOpacity(0.08),
+              AppColors.primary.withValues(alpha: 0.08),
+              AppColors.accentBlue.withValues(alpha: 0.08),
               Colors.white,
             ],
             stops: const [0.0, 0.5, 1.0],
@@ -333,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               Text(
-                "Your companion for academic achievement and organized student life.",
+                _t('loginTagline'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.getSecondaryTextColor(context),
@@ -352,8 +358,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   onTap: () {
                     _showForgotPasswordDialog();
                   },
-                  child: const Text(
-                    "Forgot Password?",
+                  child: Text(
+                    _t('forgotPassword'),
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 13,
@@ -370,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   minimumSize: const Size(double.infinity, 60),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                   elevation: 5,
-                  shadowColor: AppColors.primary.withOpacity(0.4),
+                  shadowColor: AppColors.primary.withValues(alpha: 0.4),
                 ),
                 child: _isLoading
                     ? const SizedBox(
@@ -381,8 +387,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Text(
-                        "Sign In",
+                    : Text(
+                      _t('signIn'),
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
               ),
@@ -393,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
-                      "Or continue with",
+                      _t('orContinueWith'),
                       style: TextStyle(
                         color: AppColors.getSecondaryTextColor(context),
                         fontSize: 12,
@@ -408,7 +414,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: _socialButton(
                   context,
                   "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
-                  "Google sign-in",
+                  _t('googleSignInSemantic'),
                   onTap: _handleGoogleSignIn,
                 ),
               ),
@@ -417,7 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Don't have an account? ",
+                    _t('noAccountPrompt'),
                     style: TextStyle(
                       color: AppColors.getSecondaryTextColor(context),
                       fontSize: 13,
@@ -429,13 +435,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => SignUpScreen(
+                            language: widget.language,
                             onSignUp: widget.onLogin,
                           ),
                         ),
                       );
                     },
-                    child: const Text(
-                      "Sign Up",
+                    child: Text(
+                      _t('signUp'),
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 13,
@@ -457,27 +464,27 @@ class _LoginScreenState extends State<LoginScreen> {
     String? errorText;
     if (_attemptedSubmit) {
       if (_emailController.text.isEmpty) {
-        errorText = "Please enter email address";
+        errorText = _t('pleaseEnterEmailAddress');
       } else if (!_isValidEmail(_emailController.text)) {
-        errorText = "Please enter a valid email address";
+        errorText = _t('pleaseEnterValidEmailAddress');
       }
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Email Address",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('emailAddress'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
-            hintText: "Enter Email Address",
+            hintText: _t('enterEmailAddress'),
             hintStyle: TextStyle(
               color: AppColors.getSecondaryTextColor(context),
               fontSize: 14,
@@ -500,20 +507,20 @@ class _LoginScreenState extends State<LoginScreen> {
     String? errorText;
     if (_attemptedSubmit) {
       if (_passController.text.isEmpty) {
-        errorText = "Please enter password";
+        errorText = _t('pleaseEnterPassword');
       } else if (_passController.text.length < 8) {
-        errorText = "Password must be at least 8 characters";
+        errorText = _t('passwordMinLength');
       }
     }
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            "Password",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            _t('password'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ),
         TextField(
@@ -603,7 +610,7 @@ class _LoginScreenState extends State<LoginScreen> {
             border: Border.all(color: Colors.grey[200]!),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),

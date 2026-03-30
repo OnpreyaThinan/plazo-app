@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:typed_data';
+import 'package:intl/intl.dart';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   final UserProfile user;
@@ -40,6 +42,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   final _authService = AuthService();
+  
+  DateTime? _lastLogin;
+
+  bool get _isDarkTheme => Theme.of(context).brightness == Brightness.dark;
+  Color get _successColor => _isDarkTheme ? Colors.greenAccent.shade200 : Colors.green.shade700;
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
@@ -49,6 +56,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _user = widget.user;
     _nameController = TextEditingController(text: _user.name);
     _emailController = TextEditingController(text: _user.email);
+    _loadSecurityInfo();
+  }
+
+  Future<void> _loadSecurityInfo() async {
+    try {
+      final lastLoginStr = await StorageService.getString('lastLogin');
+      if (lastLoginStr != null) {
+        _lastLogin = DateTime.parse(lastLoginStr);
+      }
+    } catch (e) {
+      debugPrint('Error loading security info: $e');
+    }
   }
 
   Future<void> _pickImage() async {
@@ -78,119 +97,181 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  void _showChangePasswordDialog() {
+  void _showLogoutConfirmDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text(
-          "Change Password",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "We'll send a password reset link to your email address.",
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                _user.email,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
+        title: Text(_t('confirmSignOutTitle')),
+        content: Text(_t('confirmSignOutMessage')),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              "Cancel",
-              style: TextStyle(
-                color: AppColors.getSecondaryTextColor(context),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(_t('cancel')),
           ),
           ElevatedButton(
-            onPressed: () async {
-              try {
-                await _authService.sendPasswordResetEmail(
-                  email: _user.email,
-                );
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.check_circle, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            "Password reset link has been sent to ${_user.email}",
-                          ),
-                        ),
-                      ],
-                    ),
-                    backgroundColor: AppColors.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    duration: const Duration(seconds: 4),
-                  ),
-                );
-
-                // Auto-logout after showing message
-                await Future.delayed(const Duration(seconds: 2));
-                if (mounted) {
-                  widget.onLogout();
-                }
-              } on FirebaseAuthException catch (e) {
-                if (!mounted) return;
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(e.message ?? "Failed to send reset email"),
-                    backgroundColor: Colors.redAccent,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                );
-              }
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              widget.onLogout();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+              backgroundColor: Colors.redAccent,
             ),
-            child: const Text(
-              "Send Link",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Text(
+              _t('confirmSignOutAction'),
+              style: const TextStyle(color: Colors.white),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        bool isSending = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              _t('changePassword'),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.getTextColor(dialogContext),
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _t('resetPasswordHint'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.getTextColor(dialogContext),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.getInputBackgroundColor(dialogContext),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _user.email,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.getTextColor(dialogContext),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSending ? null : () => Navigator.pop(dialogContext),
+                child: Text(
+                  _t('cancel'),
+                  style: TextStyle(
+                    color: AppColors.getSecondaryTextColor(dialogContext),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: isSending
+                    ? null
+                    : () async {
+                        setDialogState(() => isSending = true);
+                        try {
+                          await _authService.sendPasswordResetEmail(
+                            email: _user.email,
+                          );
+                          if (!dialogContext.mounted) return;
+                          Navigator.pop(dialogContext);
+                          if (!dialogContext.mounted) return;
+
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.white),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      "${_t('resetLinkSent')} ${_user.email}",
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+
+                          await Future.delayed(const Duration(seconds: 2));
+                          if (mounted) {
+                            widget.onLogout();
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          if (!dialogContext.mounted) return;
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text(e.message ?? _t('failedToSendEmail')),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
+                        } finally {
+                          if (dialogContext.mounted) {
+                            setDialogState(() => isSending = false);
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: isSending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        _t('sendLink'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -211,6 +292,388 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          _t('deleteAccountConfirmTitle'),
+          style: TextStyle(
+            color: Colors.redAccent,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _t('deleteAccountConfirmMessage'),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.getTextColor(dialogContext),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(dialogContext).brightness == Brightness.dark
+                    ? Colors.red.withValues(alpha: 0.25)
+                    : Colors.redAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning,
+                    color: Theme.of(dialogContext).brightness == Brightness.dark
+                        ? Colors.red.shade300
+                        : Colors.red.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _t('deleteAccountWarning'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(dialogContext).brightness == Brightness.dark
+                            ? Colors.red.shade300
+                            : Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              _t('cancel'),
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(dialogContext),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              _performDeleteAccount();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(
+              _t('deleteAccount'),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performDeleteAccount() async {
+    try {
+      await _authService.deleteAccount();
+      if (mounted) {
+        widget.onLogout();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete account: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPrivacyPolicy() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          _t('privacyPolicy'),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.getTextColor(dialogContext),
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _privacyPolicyContent(dialogContext),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              _t('cancel'),
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(dialogContext),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _privacyPolicyContent(BuildContext dialogContext) {
+    return Text(
+      '''PLAZO Privacy Policy
+
+Last Updated: March 2026
+
+1. Information We Collect
+- Account information (name, email)
+- Academic planning data (tasks, exams)
+- Device information (login history)
+- Usage statistics
+
+2. How We Use Your Data
+- Provide and improve our services
+- Send important notifications
+- Ensure account security
+- Comply with legal obligations
+
+3. Data Storage
+- Your data is stored locally on your device using SharedPreferences
+- Account data is stored securely in Firebase
+- We do not sell your personal information
+
+4. Security
+- We use Firebase Authentication for secure login
+- Data is encrypted in transit
+- We implement industry-standard security practices
+
+5. Your Rights
+- You can request your data at any time
+- You can delete your account and all associated data
+- You can export your data
+
+6. Contact
+For privacy concerns, contact us through the app settings.''',
+      style: TextStyle(
+        fontSize: 12,
+        color: AppColors.getTextColor(dialogContext),
+        height: 1.6,
+      ),
+    );
+  }
+
+  Widget _buildLastLoginInfo() {
+    final lastLoginText = _lastLogin != null
+        ? DateFormat('MMM d, yyyy h:mm a').format(_lastLogin!)
+        : _t('lastLoginNever');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.getInputBackgroundColor(context),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t('lastLogin'),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.getSecondaryTextColor(context),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                lastLoginText,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.getTextColor(context),
+                ),
+              ),
+            ],
+          ),
+          Icon(Icons.check_circle, color: AppColors.primary, size: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveSessions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _t('activeSessions'),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: AppColors.getSecondaryTextColor(context),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.getInputBackgroundColor(context),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _t('currentDevice'),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.getTextColor(context),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Windows • Now',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.getSecondaryTextColor(context),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Active',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '1 ${_t('device')}',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppColors.getSecondaryTextColor(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecurityAlertsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _t('securityAlerts'),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            color: AppColors.getSecondaryTextColor(context),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.getInputBackgroundColor(context),
+            border: Border.all(
+              color: AppColors.getSecondaryTextColor(context).withValues(alpha: 0.35),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 16,
+                        color: _successColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _t('noActiveAlerts'),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _successColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No suspicious activity detected',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.getTextColor(context),
+                    ),
+                  ),
+                ],
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: AppColors.getSecondaryTextColor(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAvatar() {
     return GestureDetector(
       onTap: _pickImage,
@@ -224,7 +687,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -243,7 +706,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -374,7 +837,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              _buildSectionTitle(_t('accountSecurity')),
+              _buildSectionTitle(_t('accountSecurity'), showIcon: true),
               _buildInfoField(_t('name'), _nameController, isEditable: true),
               _buildInfoField(_t('email'), _emailController, isEditable: true),
               Align(
@@ -382,7 +845,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: GestureDetector(
                   onTap: _showChangePasswordDialog,
                   child: Text(
-                    "Change Password?",
+                    _t('changePassword'),
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 13,
@@ -396,8 +859,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildLanguageSelector(),
               _buildDarkModeToggle(),
               const SizedBox(height: 40),
+              _buildSectionTitle(_t('securityAlerts'), showIcon: true),
+              _buildLastLoginInfo(),
+              const SizedBox(height: 24),
+              _buildActiveSessions(),
+              const SizedBox(height: 24),
+              _buildSecurityAlertsSection(),
+              const SizedBox(height: 40),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showPrivacyPolicy,
+                      icon: const Icon(Icons.privacy_tip_outlined, size: 16),
+                      label: Text(_t('viewPrivacyPolicy')),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.getTextColor(context),
+                        backgroundColor: AppColors.getInputBackgroundColor(context),
+                        side: BorderSide(
+                          color: AppColors.getSecondaryTextColor(context),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _showDeleteAccountDialog,
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: Text(_t('deleteAccountButton')),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isDarkTheme
+                            ? Colors.redAccent.withValues(alpha: 0.22)
+                            : Colors.redAccent.withValues(alpha: 0.12),
+                        foregroundColor: Colors.redAccent,
+                        elevation: 0,
+                        side: const BorderSide(color: Colors.redAccent, width: 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: widget.onLogout,
+                onPressed: _showLogoutConfirmDialog,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.getCardBackgroundColor(context),
                   foregroundColor: Colors.redAccent,
@@ -425,13 +938,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    final isAccountSecurity = title.contains('ACCOUNT');
+  Widget _buildSectionTitle(String title, {bool showIcon = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          if (isAccountSecurity)
+          if (showIcon)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Icon(
@@ -555,7 +1067,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         ListTile(
                           title: Text(
-                            "English",
+                            _t('english'),
                             style: TextStyle(
                               color: AppColors.getTextColor(context),
                               fontWeight: FontWeight.w600,
@@ -569,7 +1081,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         ListTile(
                           title: Text(
-                            "ไทย",
+                            _t('thai'),
                             style: TextStyle(
                               color: AppColors.getTextColor(context),
                               fontWeight: FontWeight.w600,
@@ -638,7 +1150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Switch(
                       value: widget.darkMode,
                       onChanged: (value) => widget.onDarkModeChange(value),
-                      activeColor: AppColors.primary,
+                      activeThumbColor: AppColors.primary,
                     ),
                   ),
                 ],

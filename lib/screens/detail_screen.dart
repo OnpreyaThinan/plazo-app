@@ -90,8 +90,8 @@ class _DetailScreenState extends State<DetailScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.08),
-              AppColors.accentBlue.withOpacity(0.08),
+              AppColors.primary.withValues(alpha: 0.08),
+              AppColors.accentBlue.withValues(alpha: 0.08),
               Theme.of(context).brightness == Brightness.dark
                   ? Colors.grey[900]!
                   : Colors.white,
@@ -109,7 +109,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 24,
                     offset: const Offset(0, 12),
                   ),
@@ -125,7 +125,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       color: (_item.type == ItemType.exam
                               ? AppColors.accentPink
                               : AppColors.accentBlue)
-                          .withOpacity(0.2),
+                          .withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -286,7 +286,7 @@ class _DetailScreenState extends State<DetailScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),

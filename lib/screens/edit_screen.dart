@@ -202,8 +202,8 @@ class _EditScreenState extends State<EditScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withOpacity(0.08),
-              AppColors.accentBlue.withOpacity(0.08),
+              AppColors.primary.withValues(alpha: 0.08),
+              AppColors.accentBlue.withValues(alpha: 0.08),
               Colors.white,
             ],
           ),
@@ -227,7 +227,7 @@ class _EditScreenState extends State<EditScreen> {
                           vertical: 6),
                   decoration: BoxDecoration(
                     color:
-                        typeColor.withOpacity(0.2),
+                        typeColor.withValues(alpha: 0.2),
                     borderRadius:
                         BorderRadius.circular(12),
                   ),
