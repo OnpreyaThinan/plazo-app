@@ -81,11 +81,61 @@ class AuthService {
   // Send password reset email
   Future<void> sendPasswordResetEmail({
     required String email,
+    String? languageCode,
   }) async {
     final auth = _authOrNull;
     if (auth == null) return;
     try {
-      await auth.sendPasswordResetEmail(email: email);
+      if (languageCode != null && languageCode.isNotEmpty) {
+        await auth.setLanguageCode(languageCode);
+      }
+
+      await auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException {
+      rethrow;
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final auth = _authOrNull;
+    if (auth == null) return;
+
+    final user = auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'user-not-found',
+        message: 'No authenticated user found.',
+      );
+    }
+
+    final email = user.email;
+    if (email == null || email.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'missing-email',
+        message: 'Unable to verify account email for password update.',
+      );
+    }
+
+    final hasPasswordProvider = user.providerData.any((provider) => provider.providerId == 'password');
+    if (!hasPasswordProvider) {
+      throw FirebaseAuthException(
+        code: 'no-password-provider',
+        message: 'This account does not use a password sign-in method.',
+      );
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+      await user.reload();
     } on FirebaseAuthException {
       rethrow;
     }

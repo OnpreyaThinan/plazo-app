@@ -38,6 +38,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late UserProfile _user;
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _currentPasswordController;
+  late TextEditingController _newPasswordController;
+  late TextEditingController _confirmPasswordController;
   bool _isEditing = false;
   String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
@@ -50,12 +53,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
+  String _authErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'wrong-password':
+      case 'invalid-credential':
+        return _t('currentPasswordIncorrect');
+      case 'weak-password':
+        return _t('weakPassword');
+      case 'requires-recent-login':
+        return _t('passwordChangeRequiresRecentLogin');
+      case 'no-password-provider':
+        return _t('passwordAccountOnly');
+      default:
+        return e.message ?? _t('signInFailed');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _user = widget.user;
     _nameController = TextEditingController(text: _user.name);
     _emailController = TextEditingController(text: _user.email);
+    _currentPasswordController = TextEditingController();
+    _newPasswordController = TextEditingController();
+    _confirmPasswordController = TextEditingController();
     _loadSecurityInfo();
   }
 
@@ -94,6 +116,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -128,6 +153,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showChangePasswordDialog() {
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -150,25 +179,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _t('resetPasswordHint'),
+                  _t('changePasswordHint'),
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.getTextColor(dialogContext),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.getInputBackgroundColor(dialogContext),
-                    borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _currentPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: _t('currentPassword'),
+                    hintText: _t('enterCurrentPassword'),
+                    filled: true,
+                    fillColor: AppColors.getInputBackgroundColor(dialogContext),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
-                  child: Text(
-                    _user.email,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.getTextColor(dialogContext),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _newPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: _t('newPassword'),
+                    hintText: _t('enterNewPassword'),
+                    filled: true,
+                    fillColor: AppColors.getInputBackgroundColor(dialogContext),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: _t('confirmNewPassword'),
+                    hintText: _t('confirmYourNewPassword'),
+                    filled: true,
+                    fillColor: AppColors.getInputBackgroundColor(dialogContext),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
@@ -189,10 +247,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: isSending
                     ? null
                     : () async {
+                        final currentPassword = _currentPasswordController.text.trim();
+                        final newPassword = _newPasswordController.text.trim();
+                        final confirmPassword = _confirmPasswordController.text.trim();
+
+                        String? validationError;
+                        if (currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
+                          validationError = _t('pleaseEnterPassword');
+                        } else if (newPassword.length < 8) {
+                          validationError = _t('passwordMinLength');
+                        } else if (newPassword != confirmPassword) {
+                          validationError = _t('passwordsDoNotMatch');
+                        } else if (currentPassword == newPassword) {
+                          validationError = _t('cannotUseSamePassword');
+                        }
+
+                        if (validationError != null) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text(validationError),
+                              backgroundColor: Colors.redAccent,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
                         setDialogState(() => isSending = true);
                         try {
-                          await _authService.sendPasswordResetEmail(
-                            email: _user.email,
+                          await _authService.changePassword(
+                            currentPassword: currentPassword,
+                            newPassword: newPassword,
                           );
                           if (!dialogContext.mounted) return;
                           Navigator.pop(dialogContext);
@@ -206,7 +294,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      "${_t('resetLinkSent')} ${_user.email}",
+                                      _t('passwordChangedSuccess'),
                                     ),
                                   ),
                                 ],
@@ -216,22 +304,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              duration: const Duration(seconds: 4),
+                              duration: const Duration(seconds: 3),
                             ),
                           );
-
-                          await Future.delayed(const Duration(seconds: 2));
-                          if (mounted) {
-                            widget.onLogout();
-                          }
                         } on FirebaseAuthException catch (e) {
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext);
-                          }
                           if (!dialogContext.mounted) return;
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
                             SnackBar(
-                              content: Text(e.message ?? _t('failedToSendEmail')),
+                              content: Text(_authErrorMessage(e)),
                               backgroundColor: Colors.redAccent,
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
@@ -261,7 +341,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       )
                     : Text(
-                        _t('sendLink'),
+                        _t('changePasswordAction'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

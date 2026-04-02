@@ -54,6 +54,24 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  String _authErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return _t('noAccountFound');
+      case 'invalid-email':
+        return _t('pleaseEnterValidEmailAddress');
+      case 'missing-android-pkg-name':
+      case 'missing-ios-bundle-id':
+      case 'unauthorized-continue-uri':
+      case 'invalid-continue-uri':
+        return e.message ?? _t('failedToSendEmail');
+      case 'no-password-provider':
+        return _t('passwordResetNeedsPasswordAccount');
+      default:
+        return e.message ?? _t('failedToSendEmail');
+    }
+  }
+
   void _showForgotPasswordDialog() {
     final resetEmailController = TextEditingController();
     
@@ -107,11 +125,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (resetEmailController.text.isNotEmpty && 
-                  _isValidEmail(resetEmailController.text)) {
+              final email = resetEmailController.text.trim();
+              if (email.isNotEmpty && _isValidEmail(email)) {
                 try {
                   await _authService.sendPasswordResetEmail(
-                    email: resetEmailController.text,
+                    email: email,
+                    languageCode: widget.language,
                   );
                   if (!dialogContext.mounted) return;
                   Navigator.pop(dialogContext);
@@ -126,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              "${_t('resetLinkSent')} ${resetEmailController.text}",
+                              "${_t('resetLinkSent')} $email",
                             ),
                           ),
                         ],
@@ -143,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (!dialogContext.mounted) return;
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
-                      content: Text(e.message ?? _t('failedToSendEmail')),
+                      content: Text(_authErrorMessage(e)),
                       backgroundColor: Colors.redAccent,
                       behavior: SnackBarBehavior.floating,
                       shape: RoundedRectangleBorder(
