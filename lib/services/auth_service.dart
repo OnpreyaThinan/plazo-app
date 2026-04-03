@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -5,6 +7,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'storage_service.dart';
 
 class AuthService {
+  static const Duration _requestTimeout = Duration(seconds: 15);
+  static const int _maxRetryAttempts = 2;
+
   GoogleSignIn? get _googleSignInOrNull => kIsWeb ? null : GoogleSignIn();
 
   FirebaseAuth? get _authOrNull {
@@ -14,6 +19,59 @@ class AuthService {
     return FirebaseAuth.instance;
   }
 
+  bool _isRetryableFirebaseError(FirebaseAuthException e) {
+    return e.code == 'network-request-failed' ||
+        e.code == 'too-many-requests' ||
+        e.code == 'internal-error';
+  }
+
+  FirebaseAuthException _toUiSafeAuthException(Object error) {
+    if (error is FirebaseAuthException) {
+      return error;
+    }
+
+    if (error is TimeoutException) {
+      return FirebaseAuthException(
+        code: 'timeout',
+        message: 'Request timed out. Please try again.',
+      );
+    }
+
+    return _defaultFailure();
+  }
+
+  FirebaseAuthException _defaultFailure() {
+    return FirebaseAuthException(
+      code: 'operation-failed',
+      message: 'Unable to complete the request. Please try again.',
+    );
+  }
+
+  Future<T> _runWithRetry<T>(Future<T> Function() operation) async {
+    FirebaseAuthException? lastError;
+
+    for (var attempt = 0; attempt <= _maxRetryAttempts; attempt++) {
+      try {
+        return await operation().timeout(_requestTimeout);
+      } on TimeoutException catch (e) {
+        lastError = _toUiSafeAuthException(e);
+      } on FirebaseAuthException catch (e) {
+        if (!_isRetryableFirebaseError(e)) {
+          throw _toUiSafeAuthException(e);
+        }
+        lastError = _toUiSafeAuthException(e);
+      } catch (e) {
+        throw _toUiSafeAuthException(e);
+      }
+
+      if (attempt == _maxRetryAttempts) {
+        throw lastError ?? _defaultFailure();
+      }
+    }
+
+    throw _defaultFailure();
+  }
+
   // Save last login timestamp
   Future<void> _saveLastLogin() async {
     try {
@@ -21,6 +79,75 @@ class AuthService {
     } catch (_) {
       // Ignore failures
     }
+  }
+
+  Future<void> _disconnectGoogleSessionSafely(GoogleSignIn? googleSignIn) async {
+    if (googleSignIn == null) return;
+    try {
+      await googleSignIn.signOut();
+      await googleSignIn.disconnect();
+    } catch (_) {
+      // Ignore provider-specific sign-out issues to avoid blocking app flow.
+    }
+  }
+
+  Future<void> _syncGoogleProfileIfMissing({
+    required User firebaseUser,
+    required GoogleSignInAccount googleUser,
+  }) async {
+    if ((firebaseUser.photoURL == null || firebaseUser.photoURL!.isEmpty) &&
+        googleUser.photoUrl != null &&
+        googleUser.photoUrl!.isNotEmpty) {
+      await firebaseUser.updatePhotoURL(googleUser.photoUrl);
+    }
+
+    if ((firebaseUser.displayName == null || firebaseUser.displayName!.isEmpty) &&
+        googleUser.displayName != null &&
+        googleUser.displayName!.isNotEmpty) {
+      await firebaseUser.updateDisplayName(googleUser.displayName);
+    }
+  }
+
+  Future<User?> _signInWithGoogleWeb(FirebaseAuth auth) async {
+    final googleProvider = GoogleAuthProvider();
+    googleProvider.setCustomParameters({'prompt': 'select_account'});
+    final userCredential = await auth.signInWithPopup(googleProvider);
+    await userCredential.user?.reload();
+    await _saveLastLogin();
+    return auth.currentUser;
+  }
+
+  Future<User?> _signInWithGoogleMobile({
+    required FirebaseAuth auth,
+    required GoogleSignIn googleSignIn,
+  }) async {
+    // Clear previous account session so user can choose a different Google account.
+    await _disconnectGoogleSessionSafely(googleSignIn);
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      return null; // User cancelled
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential = await auth.signInWithCredential(credential);
+    final firebaseUser = userCredential.user;
+
+    if (firebaseUser != null) {
+      await _syncGoogleProfileIfMissing(
+        firebaseUser: firebaseUser,
+        googleUser: googleUser,
+      );
+    }
+
+    await userCredential.user?.reload();
+    await _saveLastLogin();
+    return auth.currentUser;
   }
 
   // Get current user
@@ -37,8 +164,9 @@ class AuthService {
   }) async {
     final auth = _authOrNull;
     if (auth == null) return null;
-    try {
-      UserCredential userCredential = await auth.createUserWithEmailAndPassword(
+
+    return _runWithRetry(() async {
+      final userCredential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -51,9 +179,7 @@ class AuthService {
       await _saveLastLogin();
 
       return userCredential.user;
-    } on FirebaseAuthException {
-      rethrow;
-    }
+    });
   }
 
   // Sign in with email and password
@@ -63,19 +189,18 @@ class AuthService {
   }) async {
     final auth = _authOrNull;
     if (auth == null) return null;
-    try {
-      UserCredential userCredential = await auth.signInWithEmailAndPassword(
+
+    return _runWithRetry(() async {
+      final userCredential = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       // Save last login timestamp
       await _saveLastLogin();
-      
+
       return userCredential.user;
-    } on FirebaseAuthException {
-      rethrow;
-    }
+    });
   }
 
   // Send password reset email
@@ -85,15 +210,14 @@ class AuthService {
   }) async {
     final auth = _authOrNull;
     if (auth == null) return;
-    try {
+
+    await _runWithRetry(() async {
       if (languageCode != null && languageCode.isNotEmpty) {
         await auth.setLanguageCode(languageCode);
       }
 
       await auth.sendPasswordResetEmail(email: email.trim());
-    } on FirebaseAuthException {
-      rethrow;
-    }
+    });
   }
 
   Future<void> changePassword({
@@ -127,7 +251,7 @@ class AuthService {
       );
     }
 
-    try {
+    await _runWithRetry(() async {
       final credential = EmailAuthProvider.credential(
         email: email,
         password: currentPassword,
@@ -136,9 +260,7 @@ class AuthService {
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
       await user.reload();
-    } on FirebaseAuthException {
-      rethrow;
-    }
+    });
   }
 
   // Sign out
@@ -148,11 +270,8 @@ class AuthService {
     final googleSignIn = _googleSignInOrNull;
     try {
       await auth.signOut();
-      if (googleSignIn != null) {
-        await googleSignIn.signOut();
-        // Revoke previous Google session so the next login can choose account again.
-        await googleSignIn.disconnect();
-      }
+      // Revoke previous Google session so the next login can choose account again.
+      await _disconnectGoogleSessionSafely(googleSignIn);
     } on FirebaseAuthException {
       rethrow;
     } catch (_) {
@@ -164,64 +283,20 @@ class AuthService {
   Future<User?> signInWithGoogle() async {
     final auth = _authOrNull;
     if (auth == null) return null;
-    try {
+
+    return _runWithRetry(() async {
       if (kIsWeb) {
-        final googleProvider = GoogleAuthProvider();
-        googleProvider.setCustomParameters({'prompt': 'select_account'});
-        final userCredential = await auth.signInWithPopup(googleProvider);
-        await userCredential.user?.reload();
-        // Save last login timestamp
-        await _saveLastLogin();
-        return auth.currentUser;
+        return _signInWithGoogleWeb(auth);
       }
 
       final googleSignIn = _googleSignInOrNull;
       if (googleSignIn == null) return null;
 
-      // Clear previous account session so user can choose a different Google account.
-      try {
-        await googleSignIn.signOut();
-        await googleSignIn.disconnect();
-      } catch (_) {
-        // Ignore if there is no existing Google session.
-      }
-
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      
-      if (googleUser == null) {
-        return null; // User cancelled
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
+      return _signInWithGoogleMobile(
+        auth: auth,
+        googleSignIn: googleSignIn,
       );
-
-      UserCredential userCredential = await auth.signInWithCredential(credential);
-
-      if (userCredential.user != null) {
-        if ((userCredential.user!.photoURL == null || userCredential.user!.photoURL!.isEmpty) &&
-            googleUser.photoUrl != null &&
-            googleUser.photoUrl!.isNotEmpty) {
-          await userCredential.user!.updatePhotoURL(googleUser.photoUrl);
-        }
-
-        if ((userCredential.user!.displayName == null || userCredential.user!.displayName!.isEmpty) &&
-            googleUser.displayName != null &&
-            googleUser.displayName!.isNotEmpty) {
-          await userCredential.user!.updateDisplayName(googleUser.displayName);
-        }
-      }
-
-      await userCredential.user?.reload();
-      // Save last login timestamp
-      await _saveLastLogin();
-      return auth.currentUser;
-    } on FirebaseAuthException {
-      rethrow;
-    }
+    });
   }
 
   // Delete user account
@@ -229,22 +304,13 @@ class AuthService {
     final auth = _authOrNull;
     final googleSignIn = _googleSignInOrNull;
     if (auth == null) return;
-    
-    try {
+
+    await _runWithRetry(() async {
       // Delete user from Firebase Auth
       await auth.currentUser?.delete();
       
       // Sign out from Google
-      if (googleSignIn != null) {
-        try {
-          await googleSignIn.signOut();
-          await googleSignIn.disconnect();
-        } catch (_) {
-          // Ignore if there's no existing session
-        }
-      }
-    } on FirebaseAuthException {
-      rethrow;
-    }
+      await _disconnectGoogleSessionSafely(googleSignIn);
+    });
   }
 }

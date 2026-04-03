@@ -55,9 +55,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _authErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
+      case 'network-request-failed':
+        return 'Please check your internet connection';
       case 'wrong-password':
       case 'invalid-credential':
         return _t('currentPasswordIncorrect');
+      case 'user-not-found':
+        return 'Account not found';
+      case 'timeout':
+        return 'Something went wrong. Please try again.';
       case 'weak-password':
         return _t('weakPassword');
       case 'requires-recent-login':
@@ -65,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       case 'no-password-provider':
         return _t('passwordAccountOnly');
       default:
-        return e.message ?? _t('signInFailed');
+        return 'Something went wrong. Please try again.';
     }
   }
 
@@ -93,11 +99,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 
-    if (image != null) {
+      if (image == null) return;
+
       final bytes = await image.readAsBytes();
+      if (!mounted) return;
+
       setState(() {
         _selectedImagePath = image.path;
         _selectedImageBytes = bytes;
@@ -109,6 +119,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       });
       widget.onUserChanged(_user);
+    } catch (e) {
+      debugPrint('Failed to pick avatar image: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to load selected image. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -473,10 +492,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         widget.onLogout();
       }
     } catch (e) {
+      debugPrint('Delete account failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete account: $e'),
+          const SnackBar(
+            content: Text('Failed to delete account. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );

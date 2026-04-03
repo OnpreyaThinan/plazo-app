@@ -56,19 +56,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _authErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
+      case 'network-request-failed':
+        return 'Please check your internet connection';
+      case 'wrong-password':
+        return 'Incorrect email or password';
       case 'user-not-found':
-        return _t('noAccountFound');
+        return 'Account not found';
+      case 'timeout':
+        return 'Something went wrong. Please try again.';
       case 'invalid-email':
         return _t('pleaseEnterValidEmailAddress');
       case 'missing-android-pkg-name':
       case 'missing-ios-bundle-id':
       case 'unauthorized-continue-uri':
       case 'invalid-continue-uri':
-        return e.message ?? _t('failedToSendEmail');
+        return 'Something went wrong. Please try again.';
       case 'no-password-provider':
         return _t('passwordResetNeedsPasswordAccount');
       default:
-        return e.message ?? _t('failedToSendEmail');
+        return 'Something went wrong. Please try again.';
     }
   }
 
@@ -232,16 +238,23 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on FirebaseAuthException catch (e) {
+      debugPrint('Sign in failed [${e.code}]: ${e.message}');
       if (mounted) {
         String errorMessage = _t('signInFailed');
-        if (e.code == 'user-not-found') {
-          errorMessage = _t('noAccountFound');
+        if (e.code == 'network-request-failed') {
+          errorMessage = 'Please check your internet connection';
+        } else if (e.code == 'timeout') {
+          errorMessage = 'Something went wrong. Please try again.';
+        } else if (e.code == 'user-not-found') {
+          errorMessage = 'Account not found';
         } else if (e.code == 'wrong-password') {
-          errorMessage = _t('incorrectPassword');
+          errorMessage = 'Incorrect email or password';
         } else if (e.code == 'invalid-email') {
           errorMessage = _t('invalidEmailAddress');
         } else if (e.code == 'user-disabled') {
           errorMessage = _t('accountDisabled');
+        } else {
+          errorMessage = 'Something went wrong. Please try again.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -282,8 +295,22 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } on FirebaseAuthException catch (e) {
+      debugPrint('Google sign-in failed [${e.code}]: ${e.message}');
       if (mounted) {
-        String errorMessage = e.message ?? _t('googleSignInFailed');
+        String errorMessage;
+        switch (e.code) {
+          case 'network-request-failed':
+            errorMessage = 'Please check your internet connection';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Incorrect email or password';
+            break;
+          case 'user-not-found':
+            errorMessage = 'Account not found';
+            break;
+          default:
+            errorMessage = 'Something went wrong. Please try again.';
+        }
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

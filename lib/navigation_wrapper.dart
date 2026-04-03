@@ -64,7 +64,28 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _onDetail(String id) {
-    final item = _items.firstWhere((it) => it.id == id);
+    final item = _items.firstWhere(
+      (it) => it.id == id,
+      orElse: () => PlazoItem(
+        id: '',
+        type: ItemType.task,
+        title: '',
+        subject: '',
+        date: '',
+        time: '',
+      ),
+    );
+    if (item.id.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Item not found.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -73,6 +94,9 @@ class _MainNavigationState extends State<MainNavigation> {
           language: widget.language,
           onUpdate: (updated) => setState(() {
             final idx = _items.indexWhere((it) => it.id == updated.id);
+            if (idx == -1) {
+              return;
+            }
             _items[idx] = updated;
             _saveItems();
           }),

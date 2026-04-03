@@ -9,9 +9,31 @@ class StorageService {
 	static const String _languageKey = 'plazo_language';
 	static const String _darkModeKey = 'plazo_dark_mode';
 
-	static Future<List<PlazoItem>> loadItems() async {
+	static Future<T> _readWithFallback<T>(
+		Future<T> Function(SharedPreferences prefs) reader,
+		T fallback,
+	) async {
 		try {
 			final prefs = await SharedPreferences.getInstance();
+			return await reader(prefs);
+		} catch (_) {
+			return fallback;
+		}
+	}
+
+	static Future<void> _writeIgnoringFailure(
+		Future<void> Function(SharedPreferences prefs) writer,
+	) async {
+		try {
+			final prefs = await SharedPreferences.getInstance();
+			await writer(prefs);
+		} catch (_) {
+			// Ignore persistence failures in UI flow.
+		}
+	}
+
+	static Future<List<PlazoItem>> loadItems() async {
+		return _readWithFallback((prefs) async {
 			final rawItems = prefs.getStringList(_itemsKey) ?? [];
 			return rawItems
 					.map((entry) => jsonDecode(entry) as Map<String, dynamic>)
@@ -31,14 +53,11 @@ class StorageService {
 						),
 					)
 					.toList();
-		} catch (_) {
-			return [];
-		}
+		}, <PlazoItem>[]);
 	}
 
 	static Future<void> saveItems(List<PlazoItem> items) async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		await _writeIgnoringFailure((prefs) async {
 			final serialized = items
 					.map(
 						(item) => jsonEncode({
@@ -55,63 +74,43 @@ class StorageService {
 					)
 					.toList();
 			await prefs.setStringList(_itemsKey, serialized);
-		} catch (_) {
-			// Ignore persistence failures in UI flow.
-		}
+		});
 	}
 
 	static Future<String> loadLanguage() async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		return _readWithFallback((prefs) async {
 			return prefs.getString(_languageKey) ?? 'en';
-		} catch (_) {
-			return 'en';
-		}
+		}, 'en');
 	}
 
 	static Future<void> saveLanguage(String language) async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		await _writeIgnoringFailure((prefs) async {
 			await prefs.setString(_languageKey, language);
-		} catch (_) {
-			// Ignore persistence failures in UI flow.
-		}
+		});
 	}
 
 	static Future<bool> loadDarkMode() async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		return _readWithFallback((prefs) async {
 			return prefs.getBool(_darkModeKey) ?? false;
-		} catch (_) {
-			return false;
-		}
+		}, false);
 	}
 
 	static Future<void> saveDarkMode(bool value) async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		await _writeIgnoringFailure((prefs) async {
 			await prefs.setBool(_darkModeKey, value);
-		} catch (_) {
-			// Ignore persistence failures in UI flow.
-		}
+		});
 	}
 
 	// Generic string storage methods for app state
 	static Future<String?> getString(String key) async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		return _readWithFallback((prefs) async {
 			return prefs.getString(key);
-		} catch (_) {
-			return null;
-		}
+		}, null);
 	}
 
 	static Future<void> setString(String key, String value) async {
-		try {
-			final prefs = await SharedPreferences.getInstance();
+		await _writeIgnoringFailure((prefs) async {
 			await prefs.setString(key, value);
-		} catch (_) {
-			// Ignore persistence failures in UI flow.
-		}
+		});
 	}
 }
