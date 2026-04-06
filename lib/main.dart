@@ -34,6 +34,8 @@ class _PlazoAppState extends State<PlazoApp> {
   final _authService = AuthService();
   String _language = 'en';
   bool _darkMode = false;
+  bool _privacyConsentAccepted = false;
+  bool _privacyNoticeShown = false;
   bool _isReady = false;
 
   @override
@@ -45,12 +47,45 @@ class _PlazoAppState extends State<PlazoApp> {
   Future<void> _loadPreferences() async {
     final language = await StorageService.loadLanguage();
     final darkMode = await StorageService.loadDarkMode();
+    final privacyConsentAccepted = await StorageService.loadPrivacyConsent();
     if (!mounted) return;
     setState(() {
       _language = language;
       _darkMode = darkMode;
+      _privacyConsentAccepted = privacyConsentAccepted;
       _isReady = true;
     });
+  }
+
+  Future<void> _acceptPrivacyConsent() async {
+    await StorageService.savePrivacyConsent(true);
+    if (!mounted) return;
+    setState(() => _privacyConsentAccepted = true);
+  }
+
+  Future<void> _showPrivacyNoticeDialog(BuildContext context) async {
+    final isThai = _language == 'th';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isThai ? 'ประกาศความเป็นส่วนตัว' : 'Privacy Notice'),
+        content: Text(
+          isThai
+              ? 'Plazo ใช้ข้อมูลที่จำเป็นต่อการให้บริการ เช่น บัญชีผู้ใช้และข้อมูลที่คุณบันทึกไว้ในแอป คุณสามารถดูนโยบายความเป็นส่วนตัวและจัดการข้อมูลได้จากหน้า Settings'
+              : 'Plazo uses data required to provide core features, such as your account and items you save in the app. You can review the privacy policy and manage your data from Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(isThai ? 'รับทราบ' : 'Understood'),
+          ),
+        ],
+      ),
+    );
+
+    await _acceptPrivacyConsent();
   }
 
   void _changeLanguage(String language) {
@@ -164,9 +199,18 @@ class _PlazoAppState extends State<PlazoApp> {
       theme: _buildTheme(false),
       darkTheme: _buildTheme(true),
       themeMode: _darkMode ? ThemeMode.dark : ThemeMode.light,
+      locale: Locale(_language),
       home: StreamBuilder<User?>(
         stream: _authService.authStateChanges,
         builder: (context, snapshot) {
+          if (!_privacyConsentAccepted && !_privacyNoticeShown) {
+            _privacyNoticeShown = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _showPrivacyNoticeDialog(context);
+            });
+          }
+
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Scaffold(
               body: Center(

@@ -81,6 +81,16 @@ void main() {
 
       expect(savedDarkMode, true);
     });
+
+    test('privacy consent should default to false and then save/load correctly', () async {
+      final defaultConsent = await StorageService.loadPrivacyConsent();
+      expect(defaultConsent, false);
+
+      await StorageService.savePrivacyConsent(true);
+      final savedConsent = await StorageService.loadPrivacyConsent();
+
+      expect(savedConsent, true);
+    });
   });
 
   group('StorageService generic string', () {

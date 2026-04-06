@@ -545,8 +545,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _privacyPolicyContent(BuildContext dialogContext) {
-    return Text(
-      '''PLAZO Privacy Policy
+    final isThai = widget.language == 'th';
+    final content = isThai
+        ? '''นโยบายความเป็นส่วนตัวของ PLAZO
+
+อัปเดตล่าสุด: มีนาคม 2026
+
+1. ข้อมูลที่เราเก็บ
+- ข้อมูลบัญชี (ชื่อ, อีเมล)
+- ข้อมูลการวางแผนการเรียน (งาน, สอบ)
+- ข้อมูลอุปกรณ์ (ประวัติการเข้าสู่ระบบ)
+- สถิติการใช้งาน
+
+2. เราใช้ข้อมูลของคุณอย่างไร
+- เพื่อให้บริการและพัฒนาบริการ
+- เพื่อส่งการแจ้งเตือนที่สำคัญ
+- เพื่อความปลอดภัยของบัญชี
+- เพื่อปฏิบัติตามข้อกำหนดทางกฎหมาย
+
+3. การจัดเก็บข้อมูล
+- ข้อมูลบางส่วนจัดเก็บในอุปกรณ์ของคุณด้วย SharedPreferences
+- ข้อมูลบัญชีจัดเก็บอย่างปลอดภัยใน Firebase
+- เราไม่ขายข้อมูลส่วนบุคคลของคุณ
+
+4. ความปลอดภัย
+- เราใช้ Firebase Authentication สำหรับการเข้าสู่ระบบอย่างปลอดภัย
+- ข้อมูลถูกเข้ารหัสระหว่างการรับส่ง
+- เราใช้แนวทางความปลอดภัยตามมาตรฐานอุตสาหกรรม
+
+5. สิทธิของคุณ
+- คุณสามารถขอข้อมูลของคุณได้
+- คุณสามารถลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดได้
+- คุณสามารถส่งออกข้อมูลของคุณได้
+
+6. การติดต่อ
+หากมีข้อกังวลด้านความเป็นส่วนตัว ติดต่อเราได้ผ่านหน้าตั้งค่าในแอป'''
+        : '''PLAZO Privacy Policy
 
 Last Updated: March 2026
 
@@ -578,7 +612,10 @@ Last Updated: March 2026
 - You can export your data
 
 6. Contact
-For privacy concerns, contact us through the app settings.''',
+For privacy concerns, contact us through the app settings.''';
+
+    return Text(
+      content,
       style: TextStyle(
         fontSize: 12,
         color: AppColors.getTextColor(dialogContext),

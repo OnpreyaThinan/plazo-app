@@ -65,11 +65,11 @@ class AuthService {
       }
 
       if (attempt == _maxRetryAttempts) {
-        throw lastError ?? _defaultFailure();
+        break;
       }
     }
 
-    throw _defaultFailure();
+    throw lastError ?? _defaultFailure();
   }
 
   // Save last login timestamp

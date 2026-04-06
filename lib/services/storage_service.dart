@@ -8,6 +8,7 @@ class StorageService {
 	static const String _itemsKey = 'plazo_items';
 	static const String _languageKey = 'plazo_language';
 	static const String _darkModeKey = 'plazo_dark_mode';
+	static const String _privacyConsentKey = 'plazo_privacy_consent_v1';
 
 	static Future<T> _readWithFallback<T>(
 		Future<T> Function(SharedPreferences prefs) reader,
@@ -98,6 +99,18 @@ class StorageService {
 	static Future<void> saveDarkMode(bool value) async {
 		await _writeIgnoringFailure((prefs) async {
 			await prefs.setBool(_darkModeKey, value);
+		});
+	}
+
+	static Future<bool> loadPrivacyConsent() async {
+		return _readWithFallback((prefs) async {
+			return prefs.getBool(_privacyConsentKey) ?? false;
+		}, false);
+	}
+
+	static Future<void> savePrivacyConsent(bool value) async {
+		await _writeIgnoringFailure((prefs) async {
+			await prefs.setBool(_privacyConsentKey, value);
 		});
 	}
 

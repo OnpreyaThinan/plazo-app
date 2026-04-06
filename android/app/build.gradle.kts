@@ -15,7 +15,8 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-val appId = (project.findProperty("APP_ID") as String?) ?: "com.example.plazo_app"
+val appId = (project.findProperty("APP_ID") as String?)
+    ?: throw GradleException("Missing APP_ID in android/gradle.properties for release-ready builds.")
 
 android {
     namespace = appId
