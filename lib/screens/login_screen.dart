@@ -59,9 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'network-request-failed':
         return 'Please check your internet connection';
       case 'wrong-password':
-        return 'Incorrect email or password';
       case 'user-not-found':
-        return 'Account not found';
+        return _t('invalidCredentials');
       case 'timeout':
         return 'Something went wrong. Please try again.';
       case 'invalid-email':
@@ -206,7 +205,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      resetEmailController.dispose();
+    });
   }
 
   Future<void> _handleSignIn() async {
@@ -245,10 +246,8 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMessage = 'Please check your internet connection';
         } else if (e.code == 'timeout') {
           errorMessage = 'Something went wrong. Please try again.';
-        } else if (e.code == 'user-not-found') {
-          errorMessage = 'Account not found';
-        } else if (e.code == 'wrong-password') {
-          errorMessage = 'Incorrect email or password';
+        } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
+          errorMessage = _t('invalidCredentials');
         } else if (e.code == 'invalid-email') {
           errorMessage = _t('invalidEmailAddress');
         } else if (e.code == 'user-disabled') {
@@ -303,10 +302,8 @@ class _LoginScreenState extends State<LoginScreen> {
             errorMessage = 'Please check your internet connection';
             break;
           case 'wrong-password':
-            errorMessage = 'Incorrect email or password';
-            break;
           case 'user-not-found':
-            errorMessage = 'Account not found';
+            errorMessage = _t('invalidCredentials');
             break;
           default:
             errorMessage = 'Something went wrong. Please try again.';
@@ -662,7 +659,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
-          child: Center(child: Image.network(iconUrl, width: 26, height: 26)),
+          child: Center(
+            child: Image.network(
+              iconUrl,
+              width: 26,
+              height: 26,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.g_mobiledata,
+                size: 28,
+                color: AppColors.navy,
+              ),
+            ),
+          ),
         ),
       ),
     );

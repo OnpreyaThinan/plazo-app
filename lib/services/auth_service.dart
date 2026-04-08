@@ -4,11 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'security_service.dart';
 import 'storage_service.dart';
 
 class AuthService {
   static const Duration _requestTimeout = Duration(seconds: 15);
   static const int _maxRetryAttempts = 2;
+  final _securityService = SecurityService();
 
   GoogleSignIn? get _googleSignInOrNull => kIsWeb ? null : GoogleSignIn();
 
@@ -81,6 +83,24 @@ class AuthService {
     }
   }
 
+  Future<void> _syncCurrentSessionSafely(User? user) async {
+    if (user == null) return;
+    try {
+      await _securityService.upsertCurrentSession(uid: user.uid);
+    } catch (_) {
+      // Ignore session sync failures to keep sign-in flow resilient.
+    }
+  }
+
+  Future<void> _markCurrentSessionInactiveSafely(User? user) async {
+    if (user == null) return;
+    try {
+      await _securityService.markCurrentSessionInactive(uid: user.uid);
+    } catch (_) {
+      // Ignore session sync failures to keep sign-out flow resilient.
+    }
+  }
+
   Future<void> _disconnectGoogleSessionSafely(GoogleSignIn? googleSignIn) async {
     if (googleSignIn == null) return;
     try {
@@ -114,6 +134,7 @@ class AuthService {
     final userCredential = await auth.signInWithPopup(googleProvider);
     await userCredential.user?.reload();
     await _saveLastLogin();
+    await _syncCurrentSessionSafely(auth.currentUser);
     return auth.currentUser;
   }
 
@@ -147,6 +168,7 @@ class AuthService {
 
     await userCredential.user?.reload();
     await _saveLastLogin();
+    await _syncCurrentSessionSafely(auth.currentUser);
     return auth.currentUser;
   }
 
@@ -177,6 +199,7 @@ class AuthService {
 
       // Save last login timestamp
       await _saveLastLogin();
+      await _syncCurrentSessionSafely(userCredential.user);
 
       return userCredential.user;
     });
@@ -198,6 +221,7 @@ class AuthService {
 
       // Save last login timestamp
       await _saveLastLogin();
+      await _syncCurrentSessionSafely(userCredential.user);
 
       return userCredential.user;
     });
@@ -268,7 +292,9 @@ class AuthService {
     final auth = _authOrNull;
     if (auth == null) return;
     final googleSignIn = _googleSignInOrNull;
+    final currentUser = auth.currentUser;
     try {
+      await _markCurrentSessionInactiveSafely(currentUser);
       await auth.signOut();
       // Revoke previous Google session so the next login can choose account again.
       await _disconnectGoogleSessionSafely(googleSignIn);

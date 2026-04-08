@@ -8,7 +8,9 @@ import '../app_colors.dart';
 import '../app_strings.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
+import '../services/security_service.dart';
 import '../services/storage_service.dart';
+import '../widgets/privacy_policy_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   final UserProfile user;
@@ -45,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   final _authService = AuthService();
+  final _securityService = SecurityService();
   
   DateTime? _lastLogin;
 
@@ -89,12 +92,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSecurityInfo() async {
     try {
-      final lastLoginStr = await StorageService.getString('lastLogin');
-      if (lastLoginStr != null) {
-        _lastLogin = DateTime.parse(lastLoginStr);
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      DateTime? resolvedLastLogin;
+
+      if (uid != null && uid.isNotEmpty) {
+        resolvedLastLogin = await _securityService.loadLastLogin(uid: uid);
       }
+
+      if (resolvedLastLogin == null) {
+        final lastLoginStr = await StorageService.getString('lastLogin');
+        if (lastLoginStr != null) {
+          resolvedLastLogin = DateTime.tryParse(lastLoginStr);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _lastLogin = resolvedLastLogin;
+      });
     } catch (e) {
       debugPrint('Error loading security info: $e');
+      if (!mounted) return;
+      setState(() {});
     }
   }
 
@@ -505,122 +524,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showPrivacyPolicy() {
-    showDialog(
+    showAppPrivacyPolicyDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Text(
-          _t('privacyPolicy'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.getTextColor(dialogContext),
-          ),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _privacyPolicyContent(dialogContext),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              _t('cancel'),
-              style: TextStyle(
-                color: AppColors.getSecondaryTextColor(dialogContext),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _privacyPolicyContent(BuildContext dialogContext) {
-    final isThai = widget.language == 'th';
-    final content = isThai
-        ? '''นโยบายความเป็นส่วนตัวของ PLAZO
-
-อัปเดตล่าสุด: มีนาคม 2026
-
-1. ข้อมูลที่เราเก็บ
-- ข้อมูลบัญชี (ชื่อ, อีเมล)
-- ข้อมูลการวางแผนการเรียน (งาน, สอบ)
-- ข้อมูลอุปกรณ์ (ประวัติการเข้าสู่ระบบ)
-- สถิติการใช้งาน
-
-2. เราใช้ข้อมูลของคุณอย่างไร
-- เพื่อให้บริการและพัฒนาบริการ
-- เพื่อส่งการแจ้งเตือนที่สำคัญ
-- เพื่อความปลอดภัยของบัญชี
-- เพื่อปฏิบัติตามข้อกำหนดทางกฎหมาย
-
-3. การจัดเก็บข้อมูล
-- ข้อมูลบางส่วนจัดเก็บในอุปกรณ์ของคุณด้วย SharedPreferences
-- ข้อมูลบัญชีจัดเก็บอย่างปลอดภัยใน Firebase
-- เราไม่ขายข้อมูลส่วนบุคคลของคุณ
-
-4. ความปลอดภัย
-- เราใช้ Firebase Authentication สำหรับการเข้าสู่ระบบอย่างปลอดภัย
-- ข้อมูลถูกเข้ารหัสระหว่างการรับส่ง
-- เราใช้แนวทางความปลอดภัยตามมาตรฐานอุตสาหกรรม
-
-5. สิทธิของคุณ
-- คุณสามารถขอข้อมูลของคุณได้
-- คุณสามารถลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดได้
-- คุณสามารถส่งออกข้อมูลของคุณได้
-
-6. การติดต่อ
-หากมีข้อกังวลด้านความเป็นส่วนตัว ติดต่อเราได้ผ่านหน้าตั้งค่าในแอป'''
-        : '''PLAZO Privacy Policy
-
-Last Updated: March 2026
-
-1. Information We Collect
-- Account information (name, email)
-- Academic planning data (tasks, exams)
-- Device information (login history)
-- Usage statistics
-
-2. How We Use Your Data
-- Provide and improve our services
-- Send important notifications
-- Ensure account security
-- Comply with legal obligations
-
-3. Data Storage
-- Your data is stored locally on your device using SharedPreferences
-- Account data is stored securely in Firebase
-- We do not sell your personal information
-
-4. Security
-- We use Firebase Authentication for secure login
-- Data is encrypted in transit
-- We implement industry-standard security practices
-
-5. Your Rights
-- You can request your data at any time
-- You can delete your account and all associated data
-- You can export your data
-
-6. Contact
-For privacy concerns, contact us through the app settings.''';
-
-    return Text(
-      content,
-      style: TextStyle(
-        fontSize: 12,
-        color: AppColors.getTextColor(dialogContext),
-        height: 1.6,
-      ),
+      language: widget.language,
     );
   }
 
@@ -667,91 +573,13 @@ For privacy concerns, contact us through the app settings.''';
     );
   }
 
-  Widget _buildActiveSessions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _t('activeSessions'),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: AppColors.getSecondaryTextColor(context),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.getInputBackgroundColor(context),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _t('currentDevice'),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.getTextColor(context),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Windows • Now',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.getSecondaryTextColor(context),
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Active',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '1 ${_t('device')}',
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.getSecondaryTextColor(context),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSecurityAlertsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           _t('securityAlerts'),
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: AppColors.getSecondaryTextColor(context),
-          ),
+          style: _subsectionLabelStyle(),
         ),
         const SizedBox(height: 8),
         Container(
@@ -910,7 +738,7 @@ For privacy concerns, contact us through the app settings.''';
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          _t('profile'),
+          _t('settings'),
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w900,
@@ -974,7 +802,7 @@ For privacy concerns, contact us through the app settings.''';
                 ),
               ),
               const SizedBox(height: 40),
-              _buildSectionTitle(_t('accountSecurity'), showIcon: true),
+              _buildSectionTitle(_t('accountSecurity'), icon: Icons.person),
               _buildInfoField(_t('name'), _nameController, isEditable: true),
               _buildInfoField(_t('email'), _emailController, isEditable: true),
               Align(
@@ -992,16 +820,13 @@ For privacy concerns, contact us through the app settings.''';
                 ),
               ),
               const SizedBox(height: 32),
-              _buildSectionTitle(_t('preferences')),
+              _buildSectionTitle(_t('preferences'), icon: Icons.tune_rounded),
               _buildLanguageSelector(),
               _buildDarkModeToggle(),
               const SizedBox(height: 40),
-              _buildSectionTitle(_t('securityAlerts'), showIcon: true),
+              _buildSectionTitle(_t('security'), icon: Icons.shield_outlined),
+              _buildSubsectionTitle(_t('securityAlerts')),
               _buildLastLoginInfo(),
-              const SizedBox(height: 24),
-              _buildActiveSessions(),
-              const SizedBox(height: 24),
-              _buildSecurityAlertsSection(),
               const SizedBox(height: 40),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1075,29 +900,49 @@ For privacy concerns, contact us through the app settings.''';
     );
   }
 
-  Widget _buildSectionTitle(String title, {bool showIcon = false}) {
+  Widget _buildSectionTitle(String title, {IconData? icon}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         children: [
-          if (showIcon)
+          if (icon != null)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Icon(
-                Icons.person,
-                size: 16,
+                icon,
+                size: 18,
                 color: AppColors.getSecondaryTextColor(context),
               ),
             ),
           Text(
             title,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
               color: AppColors.getSecondaryTextColor(context),
+              letterSpacing: 0.4,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  TextStyle _subsectionLabelStyle() {
+    return TextStyle(
+      fontSize: 10,
+      fontWeight: FontWeight.w800,
+      color: AppColors.getSecondaryTextColor(context),
+      letterSpacing: 0.3,
+    );
+  }
+
+  Widget _buildSubsectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        title,
+        style: _subsectionLabelStyle(),
       ),
     );
   }
@@ -1114,11 +959,7 @@ For privacy concerns, contact us through the app settings.''';
           children: [
             Text(
               label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: AppColors.getSecondaryTextColor(context),
-              ),
+              style: _subsectionLabelStyle(),
             ),
             const SizedBox(height: 8),
             if (_isEditing && isEditable)
@@ -1138,7 +979,7 @@ For privacy concerns, contact us through the app settings.''';
                   ),
                 ),
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: AppColors.getTextColor(context),
                 ),
@@ -1155,7 +996,7 @@ For privacy concerns, contact us through the app settings.''';
                   controller.text,
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                    fontSize: 14,
                     color: AppColors.getTextColor(context),
                   ),
                 ),
@@ -1171,11 +1012,7 @@ For privacy concerns, contact us through the app settings.''';
           children: [
             Text(
               _t('language'),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                color: AppColors.getSecondaryTextColor(context),
-              ),
+              style: _subsectionLabelStyle(),
             ),
             const SizedBox(height: 8),
             Material(
@@ -1196,8 +1033,8 @@ For privacy concerns, contact us through the app settings.''';
                           child: Text(
                             _t('selectLanguage'),
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
                               color: AppColors.getTextColor(context),
                             ),
                           ),
@@ -1266,7 +1103,10 @@ For privacy concerns, contact us through the app settings.''';
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_t('darkTheme'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.getSecondaryTextColor(context))),
+            Text(
+              _t('darkTheme'),
+              style: _subsectionLabelStyle(),
+            ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -1281,7 +1121,12 @@ For privacy concerns, contact us through the app settings.''';
                     color: Colors.amber,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(_t('darkMode'), style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.getTextColor(context)))),
+                  Expanded(
+                    child: Text(
+                      _t('darkMode'),
+                      style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.getTextColor(context)),
+                    ),
+                  ),
                   Transform.scale(
                     scale: 0.8,
                     child: Switch(

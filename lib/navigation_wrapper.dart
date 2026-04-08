@@ -15,6 +15,8 @@ class MainNavigation extends StatefulWidget {
   final Function(String) onLanguageChange;
   final bool darkMode;
   final Function(bool) onDarkModeChange;
+  final int initialIndex;
+  final ValueChanged<int> onIndexChanged;
   final VoidCallback onLogout;
 
   const MainNavigation({
@@ -24,6 +26,8 @@ class MainNavigation extends StatefulWidget {
     required this.onLanguageChange,
     required this.darkMode,
     required this.onDarkModeChange,
+    required this.initialIndex,
+    required this.onIndexChanged,
     required this.onLogout,
   });
 
@@ -40,6 +44,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _user = widget.user;
     _loadItems();
   }
@@ -61,6 +66,17 @@ class _MainNavigationState extends State<MainNavigation> {
   void didUpdateWidget(covariant MainNavigation oldWidget) {
     super.didUpdateWidget(oldWidget);
     _user = widget.user;
+    if (widget.initialIndex != _currentIndex) {
+      _currentIndex = widget.initialIndex;
+    }
+  }
+
+  void _setCurrentIndex(int index) {
+    if (_currentIndex == index) {
+      return;
+    }
+    setState(() => _currentIndex = index);
+    widget.onIndexChanged(index);
   }
 
   void _onDetail(String id) {
@@ -129,7 +145,7 @@ class _MainNavigationState extends State<MainNavigation> {
         avatarUrl: _user.avatarUrl,
         avatarBytes: _user.avatarBytes,
         onDetail: _onDetail,
-        onNavigateToProfile: () => setState(() => _currentIndex = 3),
+        onNavigateToProfile: () => _setCurrentIndex(3),
       ),
       CompletedScreen(
         items: _items,
@@ -143,6 +159,7 @@ class _MainNavigationState extends State<MainNavigation> {
             _items.insert(0, newItem);
             _currentIndex = 0;
           });
+          widget.onIndexChanged(0);
           _saveItems();
         },
       ),
@@ -193,7 +210,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Widget _navIcon(IconData icon, int index) => GestureDetector(
-        onTap: () => setState(() => _currentIndex = index),
+        onTap: () => _setCurrentIndex(index),
         child: Icon(
           icon,
           color: _currentIndex == index ? AppColors.primary : Colors.grey[300],
@@ -202,7 +219,7 @@ class _MainNavigationState extends State<MainNavigation> {
       );
 
   Widget _addIcon() => GestureDetector(
-        onTap: () => setState(() => _currentIndex = 2),
+        onTap: () => _setCurrentIndex(2),
         child: Container(
           width: 50,
           height: 50,

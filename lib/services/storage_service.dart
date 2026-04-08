@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +10,9 @@ class StorageService {
 	static const String _languageKey = 'plazo_language';
 	static const String _darkModeKey = 'plazo_dark_mode';
 	static const String _privacyConsentKey = 'plazo_privacy_consent_v1';
+	static const String _privacyConsentAtKey = 'plazo_privacy_consent_at';
+	static const String _privacyConsentVersionKey = 'plazo_privacy_consent_version';
+	static const String _sessionIdKey = 'plazo_session_id';
 
 	static Future<T> _readWithFallback<T>(
 		Future<T> Function(SharedPreferences prefs) reader,
@@ -114,6 +118,36 @@ class StorageService {
 		});
 	}
 
+	static Future<void> savePrivacyConsentRecord({
+		required bool accepted,
+		required String policyVersion,
+		DateTime? acceptedAt,
+	}) async {
+		await _writeIgnoringFailure((prefs) async {
+			await prefs.setBool(_privacyConsentKey, accepted);
+			if (accepted) {
+				final timestamp = (acceptedAt ?? DateTime.now()).toIso8601String();
+				await prefs.setString(_privacyConsentAtKey, timestamp);
+				await prefs.setString(_privacyConsentVersionKey, policyVersion);
+			} else {
+				await prefs.remove(_privacyConsentAtKey);
+				await prefs.remove(_privacyConsentVersionKey);
+			}
+		});
+	}
+
+	static Future<String?> loadPrivacyConsentAcceptedAt() async {
+		return _readWithFallback((prefs) async {
+			return prefs.getString(_privacyConsentAtKey);
+		}, null);
+	}
+
+	static Future<String?> loadPrivacyConsentVersion() async {
+		return _readWithFallback((prefs) async {
+			return prefs.getString(_privacyConsentVersionKey);
+		}, null);
+	}
+
 	// Generic string storage methods for app state
 	static Future<String?> getString(String key) async {
 		return _readWithFallback((prefs) async {
@@ -125,5 +159,21 @@ class StorageService {
 		await _writeIgnoringFailure((prefs) async {
 			await prefs.setString(key, value);
 		});
+	}
+
+	static Future<String> getOrCreateSessionId() async {
+		final existing = await getString(_sessionIdKey);
+		if (existing != null && existing.isNotEmpty) {
+			return existing;
+		}
+
+		final random = Random();
+		final sessionId = 'session_${DateTime.now().microsecondsSinceEpoch}_${random.nextInt(1 << 32)}';
+		await setString(_sessionIdKey, sessionId);
+		return sessionId;
+	}
+
+	static Future<String?> getSessionId() async {
+		return getString(_sessionIdKey);
 	}
 }

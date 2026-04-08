@@ -91,6 +91,20 @@ void main() {
 
       expect(savedConsent, true);
     });
+
+    test('privacy consent metadata should be stored with version and timestamp', () async {
+      final acceptedAt = DateTime.utc(2026, 4, 9, 12, 30);
+
+      await StorageService.savePrivacyConsentRecord(
+        accepted: true,
+        policyVersion: 'v1',
+        acceptedAt: acceptedAt,
+      );
+
+      expect(await StorageService.loadPrivacyConsent(), isTrue);
+      expect(await StorageService.loadPrivacyConsentVersion(), 'v1');
+      expect(await StorageService.loadPrivacyConsentAcceptedAt(), acceptedAt.toIso8601String());
+    });
   });
 
   group('StorageService generic string', () {
