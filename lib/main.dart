@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'dart:async';
 
 import 'firebase_options.dart';
 import 'app_colors.dart';
@@ -11,6 +12,7 @@ import 'content/privacy_policy_content.dart';
 import 'models.dart';
 import 'navigation_wrapper.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
 import 'services/storage_service.dart';
 import 'widgets/privacy_policy_dialog.dart';
@@ -40,6 +42,7 @@ class _PlazoAppState extends State<PlazoApp> {
   bool _privacyConsentAccepted = false;
   bool _privacyNoticeShown = false;
   bool _isReady = false;
+  bool _showSplash = true;
   int _mainNavigationIndex = 0;
 
   String _t(String key) => AppStrings.get(key, _language);
@@ -48,6 +51,14 @@ class _PlazoAppState extends State<PlazoApp> {
   void initState() {
     super.initState();
     _loadPreferences();
+    _startSplashDelay();
+  }
+
+  void _startSplashDelay() {
+    Timer(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      setState(() => _showSplash = false);
+    });
   }
 
   Future<void> _loadPreferences() async {
@@ -225,6 +236,13 @@ class _PlazoAppState extends State<PlazoApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showSplash) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: PlazoSplashScreen(),
+      );
+    }
+
     if (!_isReady) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,

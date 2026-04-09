@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
@@ -365,20 +366,20 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 10),
               const SizedBox(
-                width: 180,
-                height: 120,
-                child: CustomPaint(
-                  painter: GraduationCapPainter(),
+                width: 210,
+                height: 110,
+                child: Center(
+                  child: LoginPzLogo(),
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 "PLAZO",
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.navy,
-                  letterSpacing: -2,
+                style: GoogleFonts.outfit(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 4,
+                  color: const Color(0xFF2D4A44),
                 ),
               ),
               Text(
@@ -664,7 +665,7 @@ class _LoginScreenState extends State<LoginScreen> {
               iconUrl,
               width: 26,
               height: 26,
-              errorBuilder: (_, __, ___) => const Icon(
+              errorBuilder: (_, error, stackTrace) => const Icon(
                 Icons.g_mobiledata,
                 size: 28,
                 color: AppColors.navy,
@@ -677,41 +678,161 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class GraduationCapPainter extends CustomPainter {
-  const GraduationCapPainter();
+class LoginPzLogo extends StatelessWidget {
+  const LoginPzLogo({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 210,
+      height: 110,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildLetter(
+                'P',
+                130,
+                const [
+                  Color(0xFF8EDCBD),
+                  Color(0xFF74C7A6),
+                  Color(0xFF5DAE90),
+                ],
+              ),
+              Transform.translate(
+                offset: const Offset(-12, 0),
+                child: _buildLetter(
+                  'z',
+                  86,
+                  const [
+                    Color(0xFF9DE5C5),
+                    Color(0xFF7FCFAE),
+                    Color(0xFF68B89A),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 28,
+            right: -16,
+            child: Transform.rotate(
+              angle: 0.14,
+              child: SizedBox(
+                width: 46,
+                height: 32,
+                child: CustomPaint(
+                  painter: const _LoginCapPainter(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLetter(String char, double size, List<Color> colors) {
+    return ShaderMask(
+      shaderCallback: (bounds) => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: colors,
+      ).createShader(bounds),
+      child: Text(
+        char,
+        style: GoogleFonts.dynaPuff(
+          fontSize: size,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          height: 1,
+          shadows: [
+            Shadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginCapPainter extends CustomPainter {
+  const _LoginCapPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final capPaint = Paint()..color = AppColors.navy;
-    final highlightPaint = Paint()..color = AppColors.primary;
-    final tasselPaint = Paint()
-      ..color = AppColors.primary
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
+    final boardFill = Paint()
+      ..color = const Color(0xFF0E1020)
+      ..style = PaintingStyle.fill;
+    final headFill = Paint()
+      ..color = const Color(0xFF171626)
+      ..style = PaintingStyle.fill;
+    final innerFill = Paint()
+      ..color = const Color(0xFF201E31)
+      ..style = PaintingStyle.fill;
+    final tassel = Paint()
+      ..color = const Color(0xFFE8CC4F)
+      ..style = PaintingStyle.fill;
+    final tasselStroke = Paint()
+      ..color = const Color(0xFFE8CC4F)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
 
-    final top = Path()
-      ..moveTo(size.width * 0.1, size.height * 0.5)
-      ..lineTo(size.width * 0.5, size.height * 0.2)
-      ..lineTo(size.width * 0.9, size.height * 0.5)
-      ..lineTo(size.width * 0.5, size.height * 0.8)
+    final board = Path()
+      ..moveTo(size.width * 0.07, size.height * 0.22)
+      ..lineTo(size.width * 0.56, size.height * 0.13)
+      ..lineTo(size.width * 0.92, size.height * 0.44)
+      ..lineTo(size.width * 0.43, size.height * 0.53)
       ..close();
-    canvas.drawPath(top, capPaint);
+    canvas.drawPath(board, boardFill);
 
-    final base = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(size.width * 0.5, size.height * 0.75),
-        width: size.width * 0.45,
-        height: size.height * 0.12,
-      ),
-      const Radius.circular(8),
-    );
-    canvas.drawRRect(base, highlightPaint);
+    final head = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.52)
+      ..lineTo(size.width * 0.24, size.height * 0.78)
+      ..lineTo(size.width * 0.62, size.height * 0.90)
+      ..lineTo(size.width * 0.64, size.height * 0.58)
+      ..close();
+    canvas.drawPath(head, headFill);
 
-    final tasselStart = Offset(size.width * 0.73, size.height * 0.48);
-    final tasselEnd = Offset(size.width * 0.78, size.height * 0.88);
-    canvas.drawLine(tasselStart, tasselEnd, tasselPaint);
-    canvas.drawCircle(tasselEnd, 5, Paint()..color = AppColors.primary);
+    final inner = Path()
+      ..moveTo(size.width * 0.34, size.height * 0.50)
+      ..quadraticBezierTo(
+        size.width * 0.52,
+        size.height * 0.56,
+        size.width * 0.66,
+        size.height * 0.66,
+      )
+      ..lineTo(size.width * 0.64, size.height * 0.58)
+      ..lineTo(size.width * 0.33, size.height * 0.52)
+      ..close();
+    canvas.drawPath(inner, innerFill);
+
+    final rope = Path()
+      ..moveTo(size.width * 0.84, size.height * 0.43)
+      ..quadraticBezierTo(
+        size.width * 0.80,
+        size.height * 0.62,
+        size.width * 0.82,
+        size.height * 0.70,
+      );
+    canvas.drawPath(rope, tasselStroke);
+    canvas.drawCircle(Offset(size.width * 0.83, size.height * 0.45), 3, tassel);
+
+    final tasselShape = Path()
+      ..moveTo(size.width * 0.79, size.height * 0.70)
+      ..lineTo(size.width * 0.74, size.height * 0.95)
+      ..lineTo(size.width * 0.86, size.height * 0.98)
+      ..lineTo(size.width * 0.89, size.height * 0.72)
+      ..close();
+    canvas.drawPath(tasselShape, tassel);
   }
 
   @override
