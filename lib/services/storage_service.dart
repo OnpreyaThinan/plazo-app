@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models.dart';
 
 class StorageService {
 	static const String _itemsKey = 'plazo_items';
+	static const String _remoteItemsDocId = 'items';
 	static const String _languageKey = 'plazo_language';
 	static const String _darkModeKey = 'plazo_dark_mode';
 	static const String _privacyConsentKey = 'plazo_privacy_consent_v1';
@@ -37,49 +41,129 @@ class StorageService {
 		}
 	}
 
-	static Future<List<PlazoItem>> loadItems() async {
+	static FirebaseFirestore? get _firestoreOrNull {
+		if (Firebase.apps.isEmpty) {
+			return null;
+		}
+		return FirebaseFirestore.instance;
+	}
+
+	static Map<String, dynamic> _itemToMap(PlazoItem item) {
+		return {
+			'id': item.id,
+			'type': item.type == ItemType.exam ? 'exam' : 'task',
+			'title': item.title,
+			'subject': item.subject,
+			'date': item.date,
+			'time': item.time,
+			'description': item.description,
+			'location': item.location,
+			'isCompleted': item.isCompleted,
+		};
+	}
+
+	static PlazoItem _itemFromMap(Map<String, dynamic> json) {
+		return PlazoItem(
+			id: json['id'] as String? ?? '',
+			type: (json['type'] as String? ?? 'task') == 'exam'
+					? ItemType.exam
+					: ItemType.task,
+			title: json['title'] as String? ?? '',
+			subject: json['subject'] as String? ?? '',
+			date: json['date'] as String? ?? '',
+			time: json['time'] as String? ?? '',
+			description: json['description'] as String? ?? '',
+			location: json['location'] as String?,
+			isCompleted: json['isCompleted'] as bool? ?? false,
+		);
+	}
+
+	static Future<List<PlazoItem>> _loadLocalItems() async {
 		return _readWithFallback((prefs) async {
 			final rawItems = prefs.getStringList(_itemsKey) ?? [];
 			return rawItems
 					.map((entry) => jsonDecode(entry) as Map<String, dynamic>)
-					.map(
-						(json) => PlazoItem(
-							id: json['id'] as String? ?? '',
-							type: (json['type'] as String? ?? 'task') == 'exam'
-									? ItemType.exam
-									: ItemType.task,
-							title: json['title'] as String? ?? '',
-							subject: json['subject'] as String? ?? '',
-							date: json['date'] as String? ?? '',
-							time: json['time'] as String? ?? '',
-							description: json['description'] as String? ?? '',
-							location: json['location'] as String?,
-							isCompleted: json['isCompleted'] as bool? ?? false,
-						),
-					)
+					.map(_itemFromMap)
 					.toList();
 		}, <PlazoItem>[]);
 	}
 
-	static Future<void> saveItems(List<PlazoItem> items) async {
+	static Future<void> _saveLocalItems(List<PlazoItem> items) async {
 		await _writeIgnoringFailure((prefs) async {
-			final serialized = items
-					.map(
-						(item) => jsonEncode({
-							'id': item.id,
-							'type': item.type == ItemType.exam ? 'exam' : 'task',
-							'title': item.title,
-							'subject': item.subject,
-							'date': item.date,
-							'time': item.time,
-							'description': item.description,
-							'location': item.location,
-							'isCompleted': item.isCompleted,
-						}),
-					)
-					.toList();
+			final serialized = items.map((item) => jsonEncode(_itemToMap(item))).toList();
 			await prefs.setStringList(_itemsKey, serialized);
 		});
+	}
+
+	static Future<List<PlazoItem>> _loadRemoteItems({required String uid}) async {
+		final firestore = _firestoreOrNull;
+		if (firestore == null || uid.isEmpty) {
+			return <PlazoItem>[];
+		}
+
+		final snapshot = await firestore.collection('users').doc(uid).collection('app_data').doc(_remoteItemsDocId).get();
+		final data = snapshot.data();
+		final rawItems = (data?['items'] as List<dynamic>?) ?? const <dynamic>[];
+
+		return rawItems
+				.whereType<Map>()
+				.map((entry) => Map<String, dynamic>.from(entry))
+				.map(_itemFromMap)
+				.toList();
+	}
+
+	static Future<void> _saveRemoteItems({required String uid, required List<PlazoItem> items}) async {
+		final firestore = _firestoreOrNull;
+		if (firestore == null || uid.isEmpty) {
+			return;
+		}
+
+		await firestore.collection('users').doc(uid).collection('app_data').doc(_remoteItemsDocId).set({
+			'items': items.map(_itemToMap).toList(),
+			'updatedAt': FieldValue.serverTimestamp(),
+		}, SetOptions(merge: true));
+	}
+
+	static Future<List<PlazoItem>> loadItems({String uid = ''}) async {
+		final localItems = await _loadLocalItems();
+
+		try {
+			final remoteItems = await _loadRemoteItems(uid: uid);
+			if (remoteItems.isNotEmpty || localItems.isNotEmpty) {
+				final mergedById = <String, PlazoItem>{};
+
+				for (final item in localItems) {
+					mergedById[item.id] = item;
+				}
+
+				for (final item in remoteItems) {
+					mergedById[item.id] = item;
+				}
+
+				final mergedItems = mergedById.values.toList();
+				await _saveLocalItems(mergedItems);
+
+				if (uid.isNotEmpty) {
+					await _saveRemoteItems(uid: uid, items: mergedItems);
+				}
+
+				return mergedItems;
+			}
+		} catch (_) {
+			debugPrint('StorageService.loadItems: falling back to local cache due to remote error.');
+		}
+
+		return localItems;
+	}
+
+	static Future<void> saveItems({String uid = '', required List<PlazoItem> items}) async {
+		await _saveLocalItems(items);
+
+		try {
+			await _saveRemoteItems(uid: uid, items: items);
+		} catch (_) {
+			debugPrint('StorageService.saveItems: remote save failed, local cache kept.');
+		}
 	}
 
 	static Future<String> loadLanguage() async {

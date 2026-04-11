@@ -55,7 +55,7 @@ class _PlazoAppState extends State<PlazoApp> {
   }
 
   void _startSplashDelay() {
-    Timer(const Duration(seconds: 10), () {
+    Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
       setState(() => _showSplash = false);
     });
@@ -292,6 +292,7 @@ class _PlazoAppState extends State<PlazoApp> {
             return MainNavigation(
               key: ValueKey(firebaseUser.uid),
               user: currentUser,
+              userId: firebaseUser.uid,
               language: _language,
               onLanguageChange: _changeLanguage,
               darkMode: _darkMode,

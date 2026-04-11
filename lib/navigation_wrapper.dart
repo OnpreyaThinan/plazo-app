@@ -11,6 +11,7 @@ import 'screens/settings_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   final UserProfile user;
+  final String userId;
   final String language;
   final Function(String) onLanguageChange;
   final bool darkMode;
@@ -22,6 +23,7 @@ class MainNavigation extends StatefulWidget {
   const MainNavigation({
     super.key,
     required this.user,
+    required this.userId,
     required this.language,
     required this.onLanguageChange,
     required this.darkMode,
@@ -50,7 +52,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _loadItems() async {
-    final loaded = await StorageService.loadItems();
+    final loaded = await StorageService.loadItems(uid: widget.userId);
     if (!mounted) return;
     setState(() {
       _items = loaded;
@@ -59,7 +61,7 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _saveItems() async {
-    await StorageService.saveItems(_items);
+    await StorageService.saveItems(uid: widget.userId, items: _items);
   }
 
   @override
@@ -108,18 +110,24 @@ class _MainNavigationState extends State<MainNavigation> {
         builder: (context) => DetailScreen(
           item: item,
           language: widget.language,
-          onUpdate: (updated) => setState(() {
-            final idx = _items.indexWhere((it) => it.id == updated.id);
-            if (idx == -1) {
-              return;
-            }
-            _items[idx] = updated;
+          onUpdate: (updated) {
+            setState(() {
+              final idx = _items.indexWhere((it) => it.id == updated.id);
+              if (idx == -1) {
+                return;
+              }
+              final nextItems = List<PlazoItem>.from(_items);
+              nextItems[idx] = updated;
+              _items = nextItems;
+            });
             _saveItems();
-          }),
-          onDelete: (id) => setState(() {
-            _items.removeWhere((it) => it.id == id);
+          },
+          onDelete: (id) {
+            setState(() {
+              _items = _items.where((it) => it.id != id).toList();
+            });
             _saveItems();
-          }),
+          },
         ),
       ),
     );
@@ -139,6 +147,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
     final List<Widget> screens = [
       HomeScreen(
+        key: ValueKey('home_${_items.length}_${_items.isNotEmpty ? _items.first.id : 'empty'}'),
         items: _items,
         language: widget.language,
         userName: _user.name,
@@ -154,13 +163,16 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
       AddScreen(
         language: widget.language,
-        onAdd: (newItem) {
+        onAdd: (newItem) async {
           setState(() {
-            _items.insert(0, newItem);
-            _currentIndex = 0;
+            _items = [newItem, ..._items];
           });
-          widget.onIndexChanged(0);
-          _saveItems();
+          _setCurrentIndex(0);
+          try {
+            await _saveItems();
+          } catch (e) {
+            debugPrint('Failed to persist added item: $e');
+          }
         },
       ),
       SettingsScreen(

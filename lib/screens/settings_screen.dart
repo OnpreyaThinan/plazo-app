@@ -10,6 +10,8 @@ import '../models.dart';
 import '../services/auth_service.dart';
 import '../services/security_service.dart';
 import '../services/storage_service.dart';
+import '../content/about_app_content.dart';
+import '../content/help_contact_content.dart';
 import '../widgets/privacy_policy_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -37,22 +39,22 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const String _notificationLeadTimeKey = 'notification_lead_time';
+  static const String _notificationsEnabledKey = 'notifications_enabled';
   late UserProfile _user;
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _currentPasswordController;
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
-  bool _isEditing = false;
   String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   final _authService = AuthService();
   final _securityService = SecurityService();
-  
-  DateTime? _lastLogin;
 
-  bool get _isDarkTheme => Theme.of(context).brightness == Brightness.dark;
-  Color get _successColor => _isDarkTheme ? Colors.greenAccent.shade200 : Colors.green.shade700;
+  DateTime? _lastLogin;
+  String _notificationLeadTime = '30m';
+  bool _notificationsEnabled = true;
 
   String _t(String key) => AppStrings.get(key, widget.language);
 
@@ -88,6 +90,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
     _loadSecurityInfo();
+    _loadNotificationPreference();
+  }
+
+  Future<void> _loadNotificationPreference() async {
+    final saved = await StorageService.getString(_notificationLeadTimeKey);
+    final enabled = await StorageService.getString(_notificationsEnabledKey);
+    if (!mounted) return;
+    if (saved == '30m' || saved == '1h' || saved == '1d') {
+      setState(() => _notificationLeadTime = saved!);
+    }
+    if (enabled != null) {
+      setState(() => _notificationsEnabled = enabled == 'true');
+    }
+  }
+
+  Future<void> _saveNotificationPreference(String value) async {
+    setState(() => _notificationLeadTime = value);
+    await StorageService.setString(_notificationLeadTimeKey, value);
+  }
+
+  Future<void> _saveNotificationsEnabled(bool value) async {
+    setState(() => _notificationsEnabled = value);
+    await StorageService.setString(_notificationsEnabledKey, value.toString());
   }
 
   Future<void> _loadSecurityInfo() async {
@@ -393,21 +418,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _toggleEditMode() {
-    if (_isEditing) {
-      setState(() {
-        _user = UserProfile(
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          avatarUrl: _selectedImagePath ?? _user.avatarUrl,
-          avatarBytes: _selectedImageBytes ?? _user.avatarBytes,
-        );
-        widget.onUserChanged(_user);
-        _isEditing = false;
-      });
-    } else {
-      setState(() => _isEditing = true);
-    }
+  void _showEditNameDialog() {
+    final nameController = TextEditingController(text: _nameController.text);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.getCardBackgroundColor(dialogContext),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          _t('name'),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.getTextColor(dialogContext),
+          ),
+        ),
+        content: TextField(
+          controller: nameController,
+          decoration: InputDecoration(
+            hintText: _t('enterFullName'),
+            filled: true,
+            fillColor: AppColors.getInputBackgroundColor(dialogContext),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              _t('cancel'),
+              style: TextStyle(
+                color: AppColors.getSecondaryTextColor(dialogContext),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newName = nameController.text.trim();
+              if (newName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_t('pleaseEnterYourName')),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                return;
+              }
+
+              setState(() {
+                _nameController.text = newName;
+                _user = UserProfile(
+                  name: newName,
+                  email: _user.email,
+                  avatarUrl: _selectedImagePath ?? _user.avatarUrl,
+                  avatarBytes: _selectedImageBytes ?? _user.avatarBytes,
+                );
+              });
+              widget.onUserChanged(_user);
+              Navigator.pop(dialogContext);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: Text(
+              _t('save'),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteAccountDialog() {
@@ -530,6 +616,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  String _notificationLabel(String value) {
+    switch (value) {
+      case '1h':
+        return widget.language == 'th' ? 'ก่อน 1 ชั่วโมง' : '1 hour before';
+      case '1d':
+        return widget.language == 'th' ? 'ก่อน 1 วัน' : '1 day before';
+      case '30m':
+      default:
+        return widget.language == 'th' ? 'ก่อน 30 นาที' : '30 minutes before';
+    }
+  }
+
+  Future<void> _showNotificationLeadTimePicker() async {
+    if (!_notificationsEnabled) {
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.getCardBackgroundColor(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        final options = <MapEntry<String, String>>[
+          MapEntry('30m', _notificationLabel('30m')),
+          MapEntry('1h', _notificationLabel('1h')),
+          MapEntry('1d', _notificationLabel('1d')),
+        ];
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  _t('notificationsLeadTime'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.getTextColor(sheetContext),
+                  ),
+                ),
+              ),
+              ...options.map((option) {
+                return ListTile(
+                  title: Text(
+                    option.value,
+                    style: TextStyle(
+                      color: AppColors.getTextColor(sheetContext),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  trailing: _notificationLeadTime == option.key
+                      ? Icon(Icons.check, color: AppColors.primary)
+                      : null,
+                  onTap: () async {
+                    await _saveNotificationPreference(option.key);
+                    if (!sheetContext.mounted) return;
+                    Navigator.pop(sheetContext);
+                  },
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openAboutApp() {
+    showAppAboutDialog(
+      context: context,
+      language: widget.language,
+    );
+  }
+
+  void _openHelpContact() {
+    showHelpContactDialog(
+      context: context,
+      language: widget.language,
+    );
+  }
+
   Widget _buildLastLoginInfo() {
     final lastLoginText = _lastLogin != null
         ? DateFormat('MMM d, yyyy h:mm a').format(_lastLogin!)
@@ -570,72 +742,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Icon(Icons.check_circle, color: AppColors.primary, size: 24),
         ],
       ),
-    );
-  }
-
-  Widget _buildSecurityAlertsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          _t('securityAlerts'),
-          style: _subsectionLabelStyle(),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: AppColors.getInputBackgroundColor(context),
-            border: Border.all(
-              color: AppColors.getSecondaryTextColor(context).withValues(alpha: 0.35),
-              width: 1,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        size: 16,
-                        color: _successColor,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _t('noActiveAlerts'),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _successColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No suspicious activity detected',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.getTextColor(context),
-                    ),
-                  ),
-                ],
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: AppColors.getSecondaryTextColor(context),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -746,31 +852,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         centerTitle: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16, top: 8),
-            child: InkWell(
-              onTap: _toggleEditMode,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Text(
-                    _isEditing ? _t('save') : _t('edit'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -802,74 +883,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              _buildSectionTitle(_t('accountSecurity'), icon: Icons.person),
-              _buildInfoField(_t('name'), _nameController, isEditable: true),
-              _buildInfoField(_t('email'), _emailController, isEditable: true),
-              Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: _showChangePasswordDialog,
-                  child: Text(
-                    _t('changePassword'),
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+              _buildSectionTitle(_t('account'), icon: Icons.person),
+              _buildNameField(),
+              _buildInfoField(_t('email'), _emailController),
               const SizedBox(height: 32),
               _buildSectionTitle(_t('preferences'), icon: Icons.tune_rounded),
               _buildLanguageSelector(),
               _buildDarkModeToggle(),
+              _buildNotificationSelector(),
               const SizedBox(height: 40),
               _buildSectionTitle(_t('security'), icon: Icons.shield_outlined),
-              _buildSubsectionTitle(_t('securityAlerts')),
+              _buildSecurityActionTile(
+                title: _t('changePasswordAction'),
+                icon: Icons.lock_outline,
+                onTap: _showChangePasswordDialog,
+              ),
+              const SizedBox(height: 12),
               _buildLastLoginInfo(),
               const SizedBox(height: 40),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _showPrivacyPolicy,
-                      icon: const Icon(Icons.privacy_tip_outlined, size: 16),
-                      label: Text(_t('viewPrivacyPolicy')),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.getTextColor(context),
-                        backgroundColor: AppColors.getInputBackgroundColor(context),
-                        side: BorderSide(
-                          color: AppColors.getSecondaryTextColor(context),
-                          width: 1,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _showDeleteAccountDialog,
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: Text(_t('deleteAccountButton')),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isDarkTheme
-                            ? Colors.redAccent.withValues(alpha: 0.22)
-                            : Colors.redAccent.withValues(alpha: 0.12),
-                        foregroundColor: Colors.redAccent,
-                        elevation: 0,
-                        side: const BorderSide(color: Colors.redAccent, width: 1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              _buildSectionTitle(_t('supportAbout'), icon: Icons.info_outline),
+              _buildSupportTile(
+                title: _t('aboutApp'),
+                icon: Icons.apps_rounded,
+                onTap: _openAboutApp,
               ),
+              const SizedBox(height: 12),
+              _buildSupportTile(
+                title: _t('privacyPolicy'),
+                icon: Icons.privacy_tip_outlined,
+                onTap: _showPrivacyPolicy,
+              ),
+              const SizedBox(height: 12),
+              _buildSupportTile(
+                title: _t('helpContact'),
+                icon: Icons.help_outline,
+                onTap: _openHelpContact,
+              ),
+              const SizedBox(height: 20),
+              _buildDeleteAccountButton(),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _showLogoutConfirmDialog,
@@ -937,21 +988,264 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSubsectionTitle(String title) {
+  Widget _buildSecurityActionTile({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.getInputBackgroundColor(context),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.getTextColor(context),
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: AppColors.getSecondaryTextColor(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationSelector() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        title,
-        style: _subsectionLabelStyle(),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t('notifications'),
+            style: _subsectionLabelStyle(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.getInputBackgroundColor(context),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.notifications_active_outlined,
+                  color: _notificationsEnabled ? AppColors.primary : AppColors.getSecondaryTextColor(context),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _notificationsEnabled
+                            ? (_t('notificationsOn'))
+                            : (_t('notificationsOff')),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.getTextColor(context),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _notificationsEnabled
+                            ? _notificationLabel(_notificationLeadTime)
+                            : (_t('notificationsDisabledHint')),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.getSecondaryTextColor(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _notificationsEnabled,
+                  onChanged: (value) async {
+                    await _saveNotificationsEnabled(value);
+                  },
+                  activeThumbColor: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _notificationsEnabled ? _showNotificationLeadTimePicker : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.getInputBackgroundColor(context).withValues(
+                    alpha: _notificationsEnabled ? 1.0 : 0.55,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_outlined,
+                      color: _notificationsEnabled
+                          ? AppColors.primary
+                          : AppColors.getSecondaryTextColor(context),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _notificationLabel(_notificationLeadTime),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.getTextColor(context),
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      color: _notificationsEnabled
+                          ? AppColors.getSecondaryTextColor(context)
+                          : AppColors.getSecondaryTextColor(context).withValues(alpha: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportTile({
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.getInputBackgroundColor(context),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.getTextColor(context),
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: AppColors.getSecondaryTextColor(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeleteAccountButton() {
+    return ElevatedButton.icon(
+      onPressed: _showDeleteAccountDialog,
+      icon: const Icon(Icons.delete_outline, size: 16),
+      label: Text(_t('deleteAccountButton')),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.redAccent.withValues(alpha: 0.22)
+            : Colors.redAccent.withValues(alpha: 0.12),
+        foregroundColor: Colors.redAccent,
+        elevation: 0,
+        side: const BorderSide(color: Colors.redAccent, width: 1),
+        minimumSize: const Size(double.infinity, 52),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNameField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _t('name'),
+            style: _subsectionLabelStyle(),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.getInputBackgroundColor(context),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _nameController.text,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: AppColors.getTextColor(context),
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: _showEditNameDialog,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildInfoField(
     String label,
-    TextEditingController controller, {
-    bool isEditable = false,
-  }) =>
+    TextEditingController controller,
+  ) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
@@ -962,45 +1256,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: _subsectionLabelStyle(),
             ),
             const SizedBox(height: 8),
-            if (_isEditing && isEditable)
-              TextField(
-                controller: controller,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: AppColors.getInputBackgroundColor(context),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  hintStyle: TextStyle(
-                    color: AppColors.getSecondaryTextColor(context),
-                    fontSize: 13,
-                  ),
-                ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: AppColors.getInputBackgroundColor(context),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                controller.text,
                 style: TextStyle(
-                  fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                   color: AppColors.getTextColor(context),
                 ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.getInputBackgroundColor(context),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  controller.text,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppColors.getTextColor(context),
-                  ),
-                ),
               ),
+            ),
           ],
         ),
       );

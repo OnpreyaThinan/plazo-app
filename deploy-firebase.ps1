@@ -34,7 +34,16 @@ Write-Host "Step 3: Update .firebaserc with your project ID" -ForegroundColor Cy
 Write-Host "Edit .firebaserc and replace 'your-firebase-project-id' with your actual project ID" -ForegroundColor Yellow
 
 Write-Host ""
-Write-Host "Step 4: Deploy to Firebase Hosting" -ForegroundColor Cyan
+Write-Host "Step 4: Build latest Flutter web" -ForegroundColor Cyan
+flutter build web --release
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "Flutter web build failed. Fix build errors, then deploy again." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Step 5: Deploy to Firebase Hosting" -ForegroundColor Cyan
 firebase deploy --only hosting
 
 Write-Host ""

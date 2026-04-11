@@ -6,7 +6,7 @@ import '../models.dart';
 
 class AddScreen extends StatefulWidget {
   final String language;
-  final Function(PlazoItem) onAdd;
+  final Future<void> Function(PlazoItem) onAdd;
   const AddScreen({
     super.key,
     required this.language,
@@ -25,6 +25,7 @@ class _AddScreenState extends State<AddScreen> {
   final _descController = TextEditingController();
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
+  bool _isSubmitting = false;
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -168,7 +169,9 @@ class _AddScreenState extends State<AddScreen> {
                 ),
                 const SizedBox(height: 40),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                     final subject = _subjectController.text.trim();
                     final title = _titleController.text.trim();
                     final location = _locationController.text.trim();
@@ -194,20 +197,29 @@ class _AddScreenState extends State<AddScreen> {
                       return;
                     }
 
-                    widget.onAdd(
-                      PlazoItem(
-                        id: DateTime.now().toString(),
-                        type: _type,
-                        title: title,
-                        subject: subject,
-                        date: _formatDate(_selectedDate!),
-                        time: _formatTime(_selectedTime!),
-                        description: _descController.text.trim(),
-                        location:
-                            _type == ItemType.exam ? location : null,
-                      ),
-                    );
-                    _resetForm();
+                    setState(() => _isSubmitting = true);
+
+                    try {
+                      await widget.onAdd(
+                        PlazoItem(
+                          id: DateTime.now().toIso8601String(),
+                          type: _type,
+                          title: title,
+                          subject: subject,
+                          date: _formatDate(_selectedDate!),
+                          time: _formatTime(_selectedTime!),
+                          description: _descController.text.trim(),
+                          location: _type == ItemType.exam ? location : null,
+                        ),
+                      );
+
+                      if (!mounted) return;
+                      _resetForm();
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isSubmitting = false);
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -216,13 +228,22 @@ class _AddScreenState extends State<AddScreen> {
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  child: Text(
-                    _t('addPlan'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _t('addPlan'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ],
             ),

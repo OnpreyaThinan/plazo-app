@@ -10,69 +10,65 @@ class PrivacyPolicyContent {
 
   static const String _thai = '''นโยบายความเป็นส่วนตัวของ PLAZO
 
-อัปเดตล่าสุด: มีนาคม 2026
+อัปเดตล่าสุด: เมษายน 2026
 
 1. ข้อมูลที่เราเก็บ
-- ข้อมูลบัญชี (ชื่อ, อีเมล)
-- ข้อมูลการวางแผนการเรียน (งาน, สอบ)
-- ข้อมูลอุปกรณ์ (ประวัติการเข้าสู่ระบบ)
-- สถิติการใช้งาน
+- ข้อมูลบัญชี เช่น ชื่อและอีเมล
+- ข้อมูลการใช้งานในแอป เช่น Tasks และ Exams
 
-2. เราใช้ข้อมูลของคุณอย่างไร
-- เพื่อให้บริการและพัฒนาบริการ
-- เพื่อส่งการแจ้งเตือนที่สำคัญ
-- เพื่อความปลอดภัยของบัญชี
-- เพื่อปฏิบัติตามข้อกำหนดทางกฎหมาย
+2. เราใช้ข้อมูลเพื่ออะไร
+- แสดงผลข้อมูลของคุณในแอป
+- ซิงก์ข้อมูลระหว่างอุปกรณ์
+- ปรับปรุงประสิทธิภาพและประสบการณ์ใช้งาน
 
-3. การจัดเก็บข้อมูล
-- ข้อมูลบางส่วนจัดเก็บในอุปกรณ์ของคุณด้วย SharedPreferences
-- ข้อมูลบัญชีจัดเก็บอย่างปลอดภัยใน Firebase
+3. การเก็บรักษาข้อมูล
+- ข้อมูลถูกจัดเก็บใน Firebase และบางส่วนในอุปกรณ์ของคุณ
+- เราเก็บข้อมูลเท่าที่จำเป็นต่อการให้บริการ
+
+4. การแชร์ข้อมูล
 - เราไม่ขายข้อมูลส่วนบุคคลของคุณ
+- เราไม่แชร์ข้อมูลกับ third-party เพื่อการโฆษณา
 
-4. ความปลอดภัย
-- เราใช้ Firebase Authentication สำหรับการเข้าสู่ระบบอย่างปลอดภัย
-- ข้อมูลถูกเข้ารหัสระหว่างการรับส่ง
-- เราใช้แนวทางความปลอดภัยตามมาตรฐานอุตสาหกรรม
+5. สิทธิของผู้ใช้
+- ขอเข้าถึงข้อมูลของคุณได้
+- ขอแก้ไข หรือลบบัญชีและข้อมูลที่เกี่ยวข้องได้
 
-5. สิทธิของคุณ
-- คุณสามารถขอข้อมูลของคุณได้
-- คุณสามารถลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดได้
-- คุณสามารถส่งออกข้อมูลของคุณได้
+6. Security
+- ใช้ระบบยืนยันตัวตน Firebase Authentication
+- เข้ารหัสข้อมูลระหว่างการรับส่ง และใช้มาตรการป้องกันตามมาตรฐานทั่วไป
 
-6. การติดต่อ
-หากมีข้อกังวลด้านความเป็นส่วนตัว ติดต่อเราได้ผ่านหน้าตั้งค่าในแอป''';
+7. Contact
+หากมีข้อสงสัยเกี่ยวกับความเป็นส่วนตัว ติดต่อได้ที่ support@plazo.app''';
 
   static const String _english = '''PLAZO Privacy Policy
 
-Last Updated: March 2026
+Last Updated: April 2026
 
 1. Information We Collect
-- Account information (name, email)
-- Academic planning data (tasks, exams)
-- Device information (login history)
-- Usage statistics
+- Account details such as name and email
+- In-app academic data such as tasks and exams
 
 2. How We Use Your Data
-- Provide and improve our services
-- Send important notifications
-- Ensure account security
-- Comply with legal obligations
+- Display your data inside the app
+- Sync your data across supported devices
+- Improve app quality and user experience
 
 3. Data Storage
-- Your data is stored locally on your device using SharedPreferences
-- Account data is stored securely in Firebase
-- We do not sell your personal information
+- Data is stored in Firebase and partly on your device for app usage
+- We retain only data required to provide core services
 
-4. Security
-- We use Firebase Authentication for secure login
-- Data is encrypted in transit
-- We implement industry-standard security practices
+4. Data Sharing
+- We do not sell your personal information
+- We do not share your personal data with third parties for advertising
 
 5. Your Rights
-- You can request your data at any time
-- You can delete your account and all associated data
-- You can export your data
+- You may request access to your personal data
+- You may request account and related data deletion
 
-6. Contact
-For privacy concerns, contact us through the app settings.''';
+6. Security
+- We use Firebase Authentication for secure sign-in
+- Data is encrypted in transit and protected using standard safeguards
+
+7. Contact
+For privacy concerns, please contact support@plazo.app''';
 }

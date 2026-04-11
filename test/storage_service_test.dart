@@ -35,7 +35,7 @@ void main() {
         ),
       ];
 
-      await StorageService.saveItems(items);
+      await StorageService.saveItems(items: items);
       final loaded = await StorageService.loadItems();
 
       expect(loaded, hasLength(2));
