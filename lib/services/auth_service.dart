@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'security_service.dart';
@@ -172,6 +175,78 @@ class AuthService {
     return auth.currentUser;
   }
 
+  Future<void> _deleteCollectionDocuments(
+    CollectionReference<Map<String, dynamic>> collection,
+  ) async {
+    while (true) {
+      final snapshot = await collection.limit(100).get();
+      if (snapshot.docs.isEmpty) {
+        break;
+      }
+
+      final batch = collection.firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
+  Future<void> _deleteUserFirestoreData(String uid) async {
+    if (uid.isEmpty || Firebase.apps.isEmpty) {
+      return;
+    }
+
+    final firestore = FirebaseFirestore.instance;
+    final userDoc = firestore.collection('users').doc(uid);
+
+    await _deleteCollectionDocuments(userDoc.collection('sessions'));
+    await _deleteCollectionDocuments(userDoc.collection('notification_tokens'));
+    await _deleteCollectionDocuments(userDoc.collection('app_data'));
+    await _deleteCollectionDocuments(userDoc.collection('profile'));
+
+    await userDoc.delete();
+  }
+
+  Future<void> _deleteUserStorageData(String uid) async {
+    if (uid.isEmpty || Firebase.apps.isEmpty) {
+      return;
+    }
+
+    try {
+      final profileFolder = FirebaseStorage.instance.ref().child('users/$uid/profile');
+      final listed = await profileFolder.listAll();
+      for (final item in listed.items) {
+        await item.delete();
+      }
+    } on FirebaseException catch (e) {
+      if (e.code != 'object-not-found') {
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> _cleanupOldProfileImages({
+    required String uid,
+    required String keepFullPath,
+  }) async {
+    try {
+      final profileFolder = FirebaseStorage.instance.ref().child('users/$uid/profile');
+      final listed = await profileFolder.listAll();
+
+      for (final item in listed.items) {
+        if (item.fullPath == keepFullPath) {
+          continue;
+        }
+        await item.delete();
+      }
+    } on FirebaseException catch (e) {
+      if (e.code != 'object-not-found') {
+        rethrow;
+      }
+    }
+  }
+
   // Get current user
   User? get currentUser => _authOrNull?.currentUser;
 
@@ -325,6 +400,68 @@ class AuthService {
     });
   }
 
+  Future<User?> updateProfile({
+    String? displayName,
+    Uint8List? avatarBytes,
+  }) async {
+    final auth = _authOrNull;
+    if (auth == null) return null;
+
+    final user = auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'user-not-found',
+        message: 'No authenticated user found.',
+      );
+    }
+
+    final uid = user.uid;
+
+    return _runWithRetry(() async {
+      final normalizedName = displayName?.trim();
+      String? nextPhotoUrl = user.photoURL;
+
+      if (avatarBytes != null && avatarBytes.isNotEmpty) {
+        final imageRef = FirebaseStorage.instance
+            .ref()
+            .child('users/$uid/profile/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+        await imageRef.putData(
+          avatarBytes,
+          SettableMetadata(
+            contentType: 'image/jpeg',
+            cacheControl: 'public,max-age=3600',
+          ),
+        );
+
+        nextPhotoUrl = await imageRef.getDownloadURL();
+        await _cleanupOldProfileImages(uid: uid, keepFullPath: imageRef.fullPath);
+      }
+
+      if (normalizedName != null && normalizedName.isNotEmpty && normalizedName != user.displayName) {
+        await user.updateDisplayName(normalizedName);
+      }
+
+      if (nextPhotoUrl != null && nextPhotoUrl.isNotEmpty && nextPhotoUrl != user.photoURL) {
+        await user.updatePhotoURL(nextPhotoUrl);
+      }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('profile')
+          .doc('public')
+          .set({
+        'displayName': normalizedName ?? user.displayName ?? '',
+        'photoUrl': nextPhotoUrl ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await user.reload();
+      return auth.currentUser;
+    });
+  }
+
   // Delete user account
   Future<void> deleteAccount() async {
     final auth = _authOrNull;
@@ -332,8 +469,14 @@ class AuthService {
     if (auth == null) return;
 
     await _runWithRetry(() async {
+      final currentUser = auth.currentUser;
+      final uid = currentUser?.uid ?? '';
+
+      await _deleteUserFirestoreData(uid);
+      await _deleteUserStorageData(uid);
+
       // Delete user from Firebase Auth
-      await auth.currentUser?.delete();
+      await currentUser?.delete();
       
       // Sign out from Google
       await _disconnectGoogleSessionSafely(googleSignIn);

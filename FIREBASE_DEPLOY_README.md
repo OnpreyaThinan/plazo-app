@@ -46,6 +46,7 @@ firebase login
 ### 6. Deploy!
 ```powershell
 cd "c:\Users\onpre\Downloads\Plazo_app\plazo_app"
+firebase deploy --only firestore:rules,storage
 firebase deploy --only hosting
 ```
 
@@ -60,8 +61,14 @@ https://your-project-id.web.app
 ### Build web ใหม่ และ deploy
 ```powershell
 flutter build web --release
+firebase deploy --only firestore:rules,storage
 firebase deploy --only hosting
 ```
+
+## Notification (Production)
+1. ผู้ใช้เปิดสวิตช์ Notifications ในหน้า Settings
+2. แอปจะขอสิทธิ์แจ้งเตือนและซิงก์ FCM token อัตโนมัติ
+3. ระบบฝั่งเซิร์ฟเวอร์ (FCM sender) ต้องเป็นผู้ยิง push จริงมายัง token ของผู้ใช้
 
 ### ดูสถานะ hosting
 ```powershell

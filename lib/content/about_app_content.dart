@@ -7,8 +7,6 @@ Future<void> showAppAboutDialog({
   required BuildContext context,
   required String language,
 }) {
-  final isThai = language == 'th';
-
   return showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(

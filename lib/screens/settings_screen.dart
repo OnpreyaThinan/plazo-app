@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:typed_data';
 import 'package:intl/intl.dart';
+import 'dart:typed_data';
 
 import '../app_colors.dart';
 import '../app_strings.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../services/security_service.dart';
 import '../services/storage_service.dart';
 import '../content/about_app_content.dart';
@@ -22,6 +23,7 @@ class SettingsScreen extends StatefulWidget {
   final Function(bool) onDarkModeChange;
   final VoidCallback onLogout;
   final Function(UserProfile) onUserChanged;
+  final Future<void> Function() onNotificationPreferencesChanged;
 
   const SettingsScreen({
     super.key,
@@ -32,6 +34,7 @@ class SettingsScreen extends StatefulWidget {
     required this.onDarkModeChange,
     required this.onLogout,
     required this.onUserChanged,
+    required this.onNotificationPreferencesChanged,
   });
 
   @override
@@ -47,7 +50,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _currentPasswordController;
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
-  String? _selectedImagePath;
   Uint8List? _selectedImageBytes;
   final _authService = AuthService();
   final _securityService = SecurityService();
@@ -108,11 +110,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveNotificationPreference(String value) async {
     setState(() => _notificationLeadTime = value);
     await StorageService.setString(_notificationLeadTimeKey, value);
+    await widget.onNotificationPreferencesChanged();
   }
 
   Future<void> _saveNotificationsEnabled(bool value) async {
+    if (value) {
+      final allowed = await NotificationService.instance.requestPermission();
+      if (!allowed) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.language == 'th'
+                  ? 'ต้องอนุญาตการแจ้งเตือนในระบบก่อนใช้งาน'
+                  : 'Please allow notifications in system settings first.',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        setState(() => _notificationsEnabled = false);
+        await StorageService.setString(_notificationsEnabledKey, 'false');
+        await widget.onNotificationPreferencesChanged();
+        return;
+      }
+    }
+
     setState(() => _notificationsEnabled = value);
     await StorageService.setString(_notificationsEnabledKey, value.toString());
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null && uid.isNotEmpty) {
+      await NotificationService.instance.bindUser(
+        uid,
+        enabled: value,
+      );
+      await NotificationService.instance.setNotificationsEnabled(
+        uid: uid,
+        enabled: value,
+      );
+    }
+
+    await widget.onNotificationPreferencesChanged();
+  }
+
+  void _syncLocalUserFromFirebase(
+    User firebaseUser, {
+    Uint8List? selectedBytes,
+  }) {
+    _nameController.text = firebaseUser.displayName ?? _nameController.text;
+    _user = UserProfile(
+      name: firebaseUser.displayName ?? _user.name,
+      email: firebaseUser.email ?? _user.email,
+      avatarUrl: firebaseUser.photoURL ?? _user.avatarUrl,
+      avatarBytes: selectedBytes,
+    );
   }
 
   Future<void> _loadSecurityInfo() async {
@@ -152,23 +203,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final bytes = await image.readAsBytes();
       if (!mounted) return;
 
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && uid.isNotEmpty) {
+        await StorageService.saveAvatarBytes(uid: uid, bytes: bytes);
+      }
+
+      // Optimistic UI update so the user sees the new avatar immediately.
       setState(() {
-        _selectedImagePath = image.path;
         _selectedImageBytes = bytes;
         _user = UserProfile(
           name: _user.name,
           email: _user.email,
-          avatarUrl: image.path,
+          avatarUrl: _user.avatarUrl,
           avatarBytes: bytes,
         );
       });
       widget.onUserChanged(_user);
+
+      final updatedUser = await _authService.updateProfile(avatarBytes: bytes);
+      if (!mounted) return;
+
+      if (updatedUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.language == 'th'
+                  ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
+                  : 'Could not sync profile image to server, but it is updated locally on this device.',
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedImageBytes = bytes;
+        _syncLocalUserFromFirebase(updatedUser, selectedBytes: bytes);
+      });
+      widget.onUserChanged(_user);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.language == 'th' ? 'อัปเดตรูปโปรไฟล์แล้ว' : 'Profile image updated.'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } on FirebaseAuthException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.language == 'th'
+                ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
+                : 'Could not sync profile image to server, but it is updated locally on this device.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     } catch (e) {
       debugPrint('Failed to pick avatar image: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to load selected image. Please try again.'),
+        SnackBar(
+          content: Text(
+            widget.language == 'th'
+                ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
+                : 'Could not sync profile image to server, but it is updated locally on this device.',
+          ),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -459,7 +561,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = nameController.text.trim();
               if (newName.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -471,17 +573,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 return;
               }
 
-              setState(() {
-                _nameController.text = newName;
-                _user = UserProfile(
-                  name: newName,
-                  email: _user.email,
-                  avatarUrl: _selectedImagePath ?? _user.avatarUrl,
-                  avatarBytes: _selectedImageBytes ?? _user.avatarBytes,
-                );
-              });
-              widget.onUserChanged(_user);
               Navigator.pop(dialogContext);
+
+              try {
+                final updatedUser = await _authService.updateProfile(displayName: newName);
+                if (!mounted || updatedUser == null) return;
+
+                setState(() {
+                  _syncLocalUserFromFirebase(updatedUser, selectedBytes: _selectedImageBytes);
+                });
+                widget.onUserChanged(_user);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(widget.language == 'th' ? 'อัปเดตชื่อเรียบร้อยแล้ว' : 'Profile name updated.'),
+                    backgroundColor: AppColors.primary,
+                  ),
+                );
+              } on FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_authErrorMessage(e)),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
@@ -596,6 +713,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         widget.onLogout();
       }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = e.code == 'requires-recent-login'
+          ? (widget.language == 'th'
+              ? 'เพื่อความปลอดภัย กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่ก่อนลบบัญชี'
+              : 'For security, please sign in again before deleting your account.')
+          : (widget.language == 'th'
+              ? 'ไม่สามารถลบบัญชีได้ กรุณาลองใหม่อีกครั้ง'
+              : 'Failed to delete account. Please try again.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     } catch (e) {
       debugPrint('Delete account failed: $e');
       if (mounted) {

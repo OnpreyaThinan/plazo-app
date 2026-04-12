@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 import 'models.dart';
+import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'screens/add_screen.dart';
 import 'screens/completed_screen.dart';
@@ -48,7 +49,22 @@ class _MainNavigationState extends State<MainNavigation> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _user = widget.user;
+    _loadCachedAvatarBytes();
     _loadItems();
+  }
+
+  Future<void> _loadCachedAvatarBytes() async {
+    final cachedAvatar = await StorageService.loadAvatarBytes(uid: widget.userId);
+    if (!mounted || cachedAvatar == null) return;
+
+    setState(() {
+      _user = UserProfile(
+        name: _user.name,
+        email: _user.email,
+        avatarUrl: _user.avatarUrl,
+        avatarBytes: cachedAvatar,
+      );
+    });
   }
 
   Future<void> _loadItems() async {
@@ -58,16 +74,66 @@ class _MainNavigationState extends State<MainNavigation> {
       _items = loaded;
       _isLoading = false;
     });
+    await _syncNotificationSchedules();
   }
 
   Future<void> _saveItems() async {
     await StorageService.saveItems(uid: widget.userId, items: _items);
+    await _syncNotificationSchedules();
+  }
+
+  Future<void> _syncNotificationSchedules() async {
+    final notificationsEnabled = (await StorageService.getString('notifications_enabled')) != 'false';
+    final leadTime = await StorageService.getString('notification_lead_time') ?? '30m';
+
+    await NotificationService.instance.syncScheduledReminders(
+      items: _items,
+      leadTime: leadTime,
+      enabled: notificationsEnabled,
+      language: widget.language,
+    );
+  }
+
+  String _normalizedAvatarUrl(String url) {
+    if (!url.startsWith('http')) {
+      return url;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return url;
+    }
+
+    final normalizedQuery = Map<String, String>.from(uri.queryParameters)..remove('v');
+    return uri.replace(queryParameters: normalizedQuery.isEmpty ? null : normalizedQuery).toString();
   }
 
   @override
   void didUpdateWidget(covariant MainNavigation oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _user = widget.user;
+
+    final oldAvatarUrl = _normalizedAvatarUrl(_user.avatarUrl);
+    final incomingAvatarUrl = _normalizedAvatarUrl(widget.user.avatarUrl);
+
+    final shouldPreserveLocalAvatar =
+        _user.avatarBytes != null && incomingAvatarUrl == oldAvatarUrl;
+
+    _user = UserProfile(
+      name: widget.user.name,
+      email: widget.user.email,
+      avatarUrl: widget.user.avatarUrl,
+      avatarBytes: shouldPreserveLocalAvatar
+          ? _user.avatarBytes
+          : widget.user.avatarBytes,
+    );
+
+    if (_user.avatarBytes == null) {
+      _loadCachedAvatarBytes();
+    }
+
+    if (oldWidget.language != widget.language) {
+      _syncNotificationSchedules();
+    }
     if (widget.initialIndex != _currentIndex) {
       _currentIndex = widget.initialIndex;
     }
@@ -185,6 +251,7 @@ class _MainNavigationState extends State<MainNavigation> {
         onUserChanged: (updatedUser) {
           setState(() => _user = updatedUser);
         },
+        onNotificationPreferencesChanged: _syncNotificationSchedules,
       ),
     ];
 

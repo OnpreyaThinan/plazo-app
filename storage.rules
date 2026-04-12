@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Each user can manage only files under their own profile folder.
+    match /users/{userId}/profile/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Deny all other paths by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

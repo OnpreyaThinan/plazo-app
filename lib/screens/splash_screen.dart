@@ -91,31 +91,6 @@ class _PlazoSplashScreenState extends State<PlazoSplashScreen> with SingleTicker
     );
   }
 
-  Widget _buildLetter(String char, double size, List<Color> colors) {
-    return ShaderMask(
-      shaderCallback: (bounds) => LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: colors,
-      ).createShader(bounds),
-      child: Text(
-        char,
-        style: GoogleFonts.dynaPuff(
-          fontSize: size,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-          height: 1,
-          shadows: [
-            Shadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 const String _plazoLogoSvg = '''

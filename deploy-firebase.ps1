@@ -43,7 +43,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Step 5: Deploy to Firebase Hosting" -ForegroundColor Cyan
+Write-Host "Step 5: Deploy Firestore/Storage rules" -ForegroundColor Cyan
+firebase deploy --only firestore:rules,storage
+
+Write-Host ""
+Write-Host "Step 6: Deploy to Firebase Hosting" -ForegroundColor Cyan
 firebase deploy --only hosting
 
 Write-Host ""

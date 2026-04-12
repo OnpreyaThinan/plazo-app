@@ -17,6 +17,7 @@ class StorageService {
 	static const String _privacyConsentAtKey = 'plazo_privacy_consent_at';
 	static const String _privacyConsentVersionKey = 'plazo_privacy_consent_version';
 	static const String _sessionIdKey = 'plazo_session_id';
+	static String _avatarBytesKey(String uid) => 'plazo_avatar_bytes_$uid';
 
 	static Future<T> _readWithFallback<T>(
 		Future<T> Function(SharedPreferences prefs) reader,
@@ -259,5 +260,24 @@ class StorageService {
 
 	static Future<String?> getSessionId() async {
 		return getString(_sessionIdKey);
+	}
+
+	static Future<void> saveAvatarBytes({
+		required String uid,
+		required List<int> bytes,
+	}) async {
+		if (uid.isEmpty || bytes.isEmpty) return;
+		await setString(_avatarBytesKey(uid), base64Encode(bytes));
+	}
+
+	static Future<Uint8List?> loadAvatarBytes({required String uid}) async {
+		if (uid.isEmpty) return null;
+		final encoded = await getString(_avatarBytesKey(uid));
+		if (encoded == null || encoded.isEmpty) return null;
+		try {
+			return Uint8List.fromList(base64Decode(encoded));
+		} catch (_) {
+			return null;
+		}
 	}
 }

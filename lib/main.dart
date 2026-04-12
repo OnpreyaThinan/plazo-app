@@ -14,6 +14,7 @@ import 'navigation_wrapper.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/auth_service.dart';
+import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 import 'widgets/privacy_policy_dialog.dart';
 
@@ -24,6 +25,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    await NotificationService.instance.initialize();
   }
   runApp(const PlazoApp());
 }
@@ -120,7 +122,10 @@ class _PlazoAppState extends State<PlazoApp> {
 
     if (accepted == true) {
       await _acceptPrivacyConsent();
-    } else if (mounted) {
+    } else {
+      if (!context.mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -152,6 +157,17 @@ class _PlazoAppState extends State<PlazoApp> {
       return;
     }
     setState(() => _mainNavigationIndex = index);
+  }
+
+  void _bindNotificationsForUser(String uid) {
+    unawaited(() async {
+      final enabledPreference = await StorageService.getString('notifications_enabled');
+      final isEnabled = enabledPreference != 'false';
+      await NotificationService.instance.bindUser(
+        uid,
+        enabled: isEnabled,
+      );
+    }());
   }
 
   UserProfile _createUserProfile(User firebaseUser) {
@@ -287,6 +303,7 @@ class _PlazoAppState extends State<PlazoApp> {
           User? firebaseUser = snapshot.data;
 
           if (firebaseUser != null) {
+            _bindNotificationsForUser(firebaseUser.uid);
             // User is logged in
             UserProfile currentUser = _createUserProfile(firebaseUser);
             return MainNavigation(
@@ -304,6 +321,7 @@ class _PlazoAppState extends State<PlazoApp> {
               },
             );
           } else {
+            unawaited(NotificationService.instance.unbindUser());
             // User is not logged in
             return LoginScreen(
               language: _language,
