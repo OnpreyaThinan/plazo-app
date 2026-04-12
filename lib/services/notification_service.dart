@@ -31,8 +31,16 @@ class NotificationService {
   bool _boundEnabled = true;
   StreamSubscription<String>? _tokenRefreshSubscription;
 
+  bool get _isWeb => kIsWeb;
+
   Future<void> initialize() async {
     if (_initialized) return;
+
+    // Web build can run without local notification scheduling.
+    if (_isWeb) {
+      _initialized = true;
+      return;
+    }
 
     tz_data.initializeTimeZones();
 
@@ -78,6 +86,10 @@ class NotificationService {
   }
 
   Future<bool> requestPermission() async {
+    if (_isWeb) {
+      return true;
+    }
+
     final settings = await FirebaseMessaging.instance.requestPermission(
       alert: true,
       badge: true,
@@ -93,6 +105,10 @@ class NotificationService {
     String uid, {
     required bool enabled,
   }) async {
+    if (_isWeb) {
+      return;
+    }
+
     if (uid.isEmpty) return;
 
     await initialize();
@@ -128,6 +144,10 @@ class NotificationService {
     required String uid,
     required bool enabled,
   }) async {
+    if (_isWeb) {
+      return;
+    }
+
     if (uid.isEmpty) return;
     await _syncCurrentToken(uid: uid, enabled: enabled);
   }
@@ -138,6 +158,10 @@ class NotificationService {
     required bool enabled,
     required String language,
   }) async {
+    if (_isWeb) {
+      return;
+    }
+
     await initialize();
     await _localNotifications.cancelAll();
 
