@@ -63,10 +63,18 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'wrong-password':
       case 'user-not-found':
         return _t('invalidCredentials');
+      case 'invalid-credential':
+        return _t('invalidCredentials');
+      case 'user-disabled':
+        return _t('accountDisabled');
       case 'timeout':
         return 'Something went wrong. Please try again.';
       case 'invalid-email':
         return _t('pleaseEnterValidEmailAddress');
+      case 'operation-not-allowed':
+        return widget.language == 'th'
+            ? 'ยังไม่ได้เปิดใช้งานการเข้าสู่ระบบด้วยอีเมลใน Firebase Console'
+            : 'Email/password sign-in is not enabled in Firebase Console.';
       case 'missing-android-pkg-name':
       case 'missing-ios-bundle-id':
       case 'unauthorized-continue-uri':
@@ -243,20 +251,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       debugPrint('Sign in failed [${e.code}]: ${e.message}');
       if (mounted) {
-        String errorMessage = _t('signInFailed');
-        if (e.code == 'network-request-failed') {
-          errorMessage = 'Please check your internet connection';
-        } else if (e.code == 'timeout') {
-          errorMessage = 'Something went wrong. Please try again.';
-        } else if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-          errorMessage = _t('invalidCredentials');
-        } else if (e.code == 'invalid-email') {
-          errorMessage = _t('invalidEmailAddress');
-        } else if (e.code == 'user-disabled') {
-          errorMessage = _t('accountDisabled');
-        } else {
-          errorMessage = 'Something went wrong. Please try again.';
-        }
+        final errorMessage = _authErrorMessage(e);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -298,18 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (e) {
       debugPrint('Google sign-in failed [${e.code}]: ${e.message}');
       if (mounted) {
-        String errorMessage;
-        switch (e.code) {
-          case 'network-request-failed':
-            errorMessage = 'Please check your internet connection';
-            break;
-          case 'wrong-password':
-          case 'user-not-found':
-            errorMessage = _t('invalidCredentials');
-            break;
-          default:
-            errorMessage = 'Something went wrong. Please try again.';
-        }
+        final errorMessage = _authErrorMessage(e);
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

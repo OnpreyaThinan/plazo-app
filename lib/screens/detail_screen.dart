@@ -8,6 +8,7 @@ import 'edit_screen.dart';
 class DetailScreen extends StatefulWidget {
   final PlazoItem item;
   final String language;
+  final bool darkMode;
   final Function(PlazoItem) onUpdate;
   final Function(String) onDelete;
 
@@ -15,6 +16,7 @@ class DetailScreen extends StatefulWidget {
     super.key,
     required this.item,
     required this.language,
+    required this.darkMode,
     required this.onUpdate,
     required this.onDelete,
   });
@@ -54,8 +56,15 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = widget.darkMode;
+    final baseBackground = isDark ? AppColors.darkBg : AppColors.bgDetailLight;
+    final cardBackground = isDark ? Colors.grey[900]! : Colors.white;
+    final inputBackground = isDark ? Colors.grey[850]! : AppColors.bgInput;
+    final textColor = isDark ? Colors.white : AppColors.textMain;
+    final secondaryTextColor = isDark ? Colors.grey[400]! : Colors.grey;
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: baseBackground,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -90,162 +99,143 @@ class _DetailScreenState extends State<DetailScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withValues(alpha: 0.08),
-              AppColors.accentBlue.withValues(alpha: 0.08),
-              Theme.of(context).brightness == Brightness.dark
-                  ? Colors.grey[900]!
-                  : Colors.white,
+              AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.10),
+              AppColors.accentBlue.withValues(alpha: isDark ? 0.12 : 0.10),
+              baseBackground,
             ],
             stops: const [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.getCardBackgroundColor(context),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: (_item.type == ItemType.exam
-                              ? AppColors.accentPink
-                              : AppColors.accentBlue)
-                          .withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _item.type == ItemType.exam ? _t('exam') : _t('task'),
-                      style: TextStyle(
-                        color: _item.type == ItemType.exam
-                            ? AppColors.accentPink
-                            : AppColors.accentBlue,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _item.subject,
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    _item.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color:
-                          AppColors.getSecondaryTextColor(context),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _infoRow(
-                          Icons.calendar_today,
-                          _item.date,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _infoRow(
-                          Icons.access_time,
-                          _item.time,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_item.location != null) ...[
-                    const SizedBox(height: 10),
-                    _infoRow(Icons.location_on, _item.location!),
-                  ],
-                  const SizedBox(height: 24),
-                  Text(
-                    _t('briefNotes').toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      color:
-                          AppColors.getSecondaryTextColor(context),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color:
-                          AppColors.getInputBackgroundColor(context),
-                      borderRadius: BorderRadius.circular(22),
+                      color: cardBackground,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      _item.description.isEmpty
-                          ? _t('noAdditionalNotes')
-                          : _item.description,
-                      style: TextStyle(
-                        height: 1.5,
-                        color:
-                            AppColors.getTextColor(context),
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: (_item.type == ItemType.exam ? AppColors.accentPink : AppColors.accentBlue)
+                                .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _item.type == ItemType.exam ? _t('exam') : _t('task'),
+                            style: TextStyle(
+                              color: _item.type == ItemType.exam ? AppColors.accentPink : AppColors.accentBlue,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _item.subject,
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
+                          ),
+                        ),
+                        Text(
+                          _item.title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: secondaryTextColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _infoRow(Icons.calendar_today, _item.date),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _infoRow(Icons.access_time, _item.time),
+                            ),
+                          ],
+                        ),
+                        if (_item.location != null) ...[
+                          const SizedBox(height: 10),
+                          _infoRow(Icons.location_on, _item.location!),
+                        ],
+                        const SizedBox(height: 24),
+                        Text(
+                          _t('briefNotes').toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: secondaryTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: inputBackground,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Text(
+                            _item.description.isEmpty ? _t('noAdditionalNotes') : _item.description,
+                            style: TextStyle(
+                              height: 1.5,
+                              color: textColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        ElevatedButton(
+                          onPressed: () {
+                            _item.isCompleted = !_item.isCompleted;
+                            widget.onUpdate(_item);
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _item.isCompleted
+                                ? inputBackground
+                                : AppColors.primary,
+                            minimumSize: const Size(double.infinity, 60),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            _item.isCompleted ? _t('moveToPending') : _t('done'),
+                            style: TextStyle(
+                              color: _item.isCompleted ? secondaryTextColor : Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      _item.isCompleted =
-                          !_item.isCompleted;
-                      widget.onUpdate(_item);
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _item.isCompleted
-                          ? AppColors.getInputBackgroundColor(
-                              context)
-                          : AppColors.primary,
-                      minimumSize:
-                          const Size(double.infinity, 60),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(25),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      _item.isCompleted
-                          ? _t('moveToPending')
-                          : _t('done'),
-                      style: TextStyle(
-                        color: _item.isCompleted
-                            ? AppColors
-                                .getSecondaryTextColor(
-                                    context)
-                            : Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -253,6 +243,9 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _infoRow(IconData icon, String text) {
+    final secondaryTextColor =
+        widget.darkMode ? Colors.grey[400]! : Colors.grey;
+
     return Row(
       children: [
         Icon(icon, color: AppColors.primary, size: 18),
@@ -261,7 +254,7 @@ class _DetailScreenState extends State<DetailScreen> {
           text,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: AppColors.getSecondaryTextColor(context),
+            color: secondaryTextColor,
           ),
         ),
       ],
@@ -273,6 +266,11 @@ class _DetailScreenState extends State<DetailScreen> {
     required VoidCallback onTap,
     Color? iconColor,
   }) {
+    final cardBackground =
+        widget.darkMode ? Colors.grey[900]! : Colors.white;
+    final textColor =
+        widget.darkMode ? Colors.white : AppColors.textMain;
+
     return Padding(
       padding: const EdgeInsets.only(left: 12),
       child: InkResponse(
@@ -282,7 +280,7 @@ class _DetailScreenState extends State<DetailScreen> {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: AppColors.getCardBackgroundColor(context),
+            color: cardBackground,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -294,8 +292,7 @@ class _DetailScreenState extends State<DetailScreen> {
           ),
           child: Icon(
             icon,
-            color:
-                iconColor ?? AppColors.getTextColor(context),
+            color: iconColor ?? textColor,
             size: 20,
           ),
         ),

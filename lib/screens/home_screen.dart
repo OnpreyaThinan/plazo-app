@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
   final String userName;
   final String avatarUrl;
   final Uint8List? avatarBytes;
+  final double contentBottomPadding;
   final Function(String) onDetail;
   final VoidCallback? onNavigateToProfile;
 
@@ -23,6 +24,7 @@ class HomeScreen extends StatefulWidget {
     required this.userName,
     required this.avatarUrl,
     this.avatarBytes,
+    this.contentBottomPadding = 0,
     required this.onDetail,
     this.onNavigateToProfile,
   });
@@ -234,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-                  const SizedBox(height: 100),
+        				  SizedBox(height: widget.contentBottomPadding),
                 ],
               ),
             ),

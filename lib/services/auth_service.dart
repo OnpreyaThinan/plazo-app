@@ -78,9 +78,10 @@ class AuthService {
   }
 
   // Save last login timestamp
-  Future<void> _saveLastLogin() async {
+  Future<void> _saveLastLogin(String uid) async {
+    if (uid.isEmpty) return;
     try {
-      await StorageService.setString('lastLogin', DateTime.now().toIso8601String());
+      await StorageService.saveLastLoginAt(uid: uid);
     } catch (_) {
       // Ignore failures
     }
@@ -136,9 +137,12 @@ class AuthService {
     googleProvider.setCustomParameters({'prompt': 'select_account'});
     final userCredential = await auth.signInWithPopup(googleProvider);
     await userCredential.user?.reload();
-    await _saveLastLogin();
-    await _syncCurrentSessionSafely(auth.currentUser);
-    return auth.currentUser;
+    final current = auth.currentUser;
+    if (current != null) {
+      await _saveLastLogin(current.uid);
+      await _syncCurrentSessionSafely(current);
+    }
+    return current;
   }
 
   Future<User?> _signInWithGoogleMobile({
@@ -170,9 +174,12 @@ class AuthService {
     }
 
     await userCredential.user?.reload();
-    await _saveLastLogin();
-    await _syncCurrentSessionSafely(auth.currentUser);
-    return auth.currentUser;
+    final current = auth.currentUser;
+    if (current != null) {
+      await _saveLastLogin(current.uid);
+      await _syncCurrentSessionSafely(current);
+    }
+    return current;
   }
 
   Future<void> _deleteCollectionDocuments(
@@ -273,7 +280,7 @@ class AuthService {
       await userCredential.user?.reload();
 
       // Save last login timestamp
-      await _saveLastLogin();
+      await _saveLastLogin(userCredential.user?.uid ?? '');
       await _syncCurrentSessionSafely(userCredential.user);
 
       return userCredential.user;
@@ -295,7 +302,7 @@ class AuthService {
       );
 
       // Save last login timestamp
-      await _saveLastLogin();
+      await _saveLastLogin(userCredential.user?.uid ?? '');
       await _syncCurrentSessionSafely(userCredential.user);
 
       return userCredential.user;

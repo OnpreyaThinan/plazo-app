@@ -22,6 +22,8 @@ class NotificationService {
   static const String _channelId = 'plazo_default_channel';
   static const String _channelName = 'Plazo Notifications';
   static const String _channelDescription = 'General notifications for Plazo app';
+  static const String _appDisplayName = 'Plazo';
+  static const String _androidSmallIcon = 'ic_notification';
 
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
@@ -29,6 +31,7 @@ class NotificationService {
   bool _initialized = false;
   String? _boundUid;
   bool _boundEnabled = true;
+  bool _permissionRequested = false;
   StreamSubscription<String>? _tokenRefreshSubscription;
 
   bool get _isWeb => kIsWeb;
@@ -36,102 +39,158 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
 
-    // Web build can run without local notification scheduling.
     if (_isWeb) {
       _initialized = true;
       return;
     }
 
-    tz_data.initializeTimeZones();
+    try {
+      tz_data.initializeTimeZones();
 
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    const androidInit = AndroidInitializationSettings('ic_launcher');
-    const iosInit = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
+      // ✅ FIX: ใช้ @mipmap/ic_launcher
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings();
+      const initSettings = InitializationSettings(
+        android: androidInit,
+        iOS: iosInit,
+      );
 
-    await _localNotifications.initialize(initSettings);
+      await _localNotifications.initialize(initSettings);
 
-    const androidChannel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      description: _channelDescription,
-      importance: Importance.high,
-    );
+      const androidChannel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.high,
+      );
+
+      final androidPlugin =
+          _localNotifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.createNotificationChannel(androidChannel);
+
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+
+      final initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        _handleMessageOpenedApp(initialMessage);
+      }
+
+      _initialized = true;
+    } catch (e) {
+      debugPrint('Notification init error: $e');
+    }
+  }
+
+  Future<bool> requestPermission() async {
+    if (_isWeb) return true;
+
+    await initialize();
+
+    debugPrint('🔔 [NOTIF] requestPermission called');
 
     final androidPlugin =
         _localNotifications.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
-    await androidPlugin?.createNotificationChannel(androidChannel);
+    final androidAllowed = await androidPlugin?.requestNotificationsPermission();
+    debugPrint('🔔 [NOTIF] Android permission result: $androidAllowed');
 
-    await FirebaseMessaging.instance
-        .setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
-
-    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessageOpenedApp(initialMessage);
+    // Request FCM permission as best-effort only.
+    // Local scheduled reminders should still work independently.
+    try {
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      debugPrint('🔔 [NOTIF] FCM permission requested successfully');
+    } catch (e) {
+      debugPrint('🔔 [NOTIF] FCM permission request error (ignored): $e');
+      // Ignore FCM permission failures for local reminders.
     }
 
-    _initialized = true;
-  }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final result = androidAllowed ?? true;
+      debugPrint('🔔 [NOTIF] requestPermission returning: $result (Android)');
+      return result;
+    }
 
-  Future<bool> requestPermission() async {
-    if (_isWeb) {
+    // iOS/macOS: rely on FCM authorization status when Android plugin is not used.
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      final result = settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+      debugPrint('🔔 [NOTIF] requestPermission returning: $result (iOS, status=${settings.authorizationStatus})');
+      return result;
+    } catch (e) {
+      debugPrint('🔔 [NOTIF] requestPermission iOS error (returning true): $e');
       return true;
     }
-
-    final settings = await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   Future<void> bindUser(
     String uid, {
     required bool enabled,
   }) async {
+    debugPrint('🔔 [NOTIF] bindUser called - uid=$uid, enabled=$enabled');
+    
     if (_isWeb) {
+      debugPrint('🔔 [NOTIF] bindUser: Web platform, returning');
       return;
     }
-
-    if (uid.isEmpty) return;
+    if (uid.isEmpty) {
+      debugPrint('🔔 [NOTIF] bindUser: Empty UID, returning');
+      return;
+    }
 
     await initialize();
 
     if (_boundUid == uid && _boundEnabled == enabled) {
+      debugPrint('🔔 [NOTIF] bindUser: Already bound with same settings, returning');
       return;
     }
 
     _boundUid = uid;
     _boundEnabled = enabled;
+    debugPrint('🔔 [NOTIF] bindUser: Updated _boundUid and _boundEnabled');
 
-    await _syncCurrentToken(uid: uid, enabled: enabled);
+    if (enabled && !_permissionRequested) {
+      debugPrint('🔔 [NOTIF] bindUser: Requesting permission');
+      _permissionRequested = true;
+      final allowed = await requestPermission();
+      debugPrint('🔔 [NOTIF] bindUser: Permission result=$allowed');
+      if (!allowed) {
+        _boundEnabled = false;
+        debugPrint('🔔 [NOTIF] bindUser: Permission denied, set _boundEnabled=false');
+      }
+    } else {
+      debugPrint('🔔 [NOTIF] bindUser: Skip permission (enabled=$enabled, _permissionRequested=$_permissionRequested)');
+    }
+
+    await _syncCurrentToken(uid: uid, enabled: _boundEnabled);
 
     await _tokenRefreshSubscription?.cancel();
-    _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen(
-      (token) {
-        _upsertToken(
-          uid: uid,
-          token: token,
-          enabled: _boundEnabled,
-        );
-      },
-    );
+    _tokenRefreshSubscription =
+        FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      _upsertToken(
+        uid: uid,
+        token: token,
+        enabled: _boundEnabled,
+      );
+    });
+    debugPrint('🔔 [NOTIF] bindUser: Completed');
   }
 
   Future<void> unbindUser() async {
@@ -144,11 +203,9 @@ class NotificationService {
     required String uid,
     required bool enabled,
   }) async {
-    if (_isWeb) {
-      return;
-    }
-
+    if (_isWeb) return;
     if (uid.isEmpty) return;
+
     await _syncCurrentToken(uid: uid, enabled: enabled);
   }
 
@@ -158,77 +215,150 @@ class NotificationService {
     required bool enabled,
     required String language,
   }) async {
-    if (_isWeb) {
-      return;
-    }
+    if (_isWeb) return;
+
+    debugPrint('🔔 [NOTIF] syncScheduledReminders called - enabled=$enabled, leadTime=$leadTime, itemCount=${items.length}');
 
     await initialize();
     await _localNotifications.cancelAll();
+    debugPrint('🔔 [NOTIF] Cancelled all previous notifications');
 
     if (!enabled) {
+      debugPrint('🔔 [NOTIF] Notifications disabled, returning early');
       return;
+    }
+
+    final hasPermission = await _hasLocalNotificationPermission();
+    debugPrint('🔔 [NOTIF] Permission check: hasPermission=$hasPermission');
+
+    if (!hasPermission) {
+      debugPrint('🔔 [NOTIF] No permission, requesting...');
+      final granted = await requestPermission();
+      debugPrint('🔔 [NOTIF] Permission request result: granted=$granted');
+      if (!granted) {
+        debugPrint('🔔 [NOTIF] Permission denied, returning early');
+        return;
+      }
     }
 
     final leadDuration = _leadDuration(leadTime);
     final now = DateTime.now();
     final isThai = language == 'th';
 
+    debugPrint('🔔 [NOTIF] Lead duration: $leadDuration, now: $now');
+
+    int scheduledCount = 0;
+    int skippedCompleted = 0;
+    int skippedPastDate = 0;
+    int skippedParseError = 0;
+
     for (final item in items) {
       if (item.isCompleted) {
+        skippedCompleted++;
         continue;
       }
 
       final dueAt = _parseItemDateTime(item);
       if (dueAt == null) {
+        debugPrint('🔔 [NOTIF] Failed to parse date for item "${item.title}" (${item.date} ${item.time})');
+        skippedParseError++;
         continue;
       }
 
       final remindAt = dueAt.subtract(leadDuration);
       if (!remindAt.isAfter(now)) {
+        debugPrint('🔔 [NOTIF] Skipped past date "${item.title}" - remindAt=$remindAt, now=$now');
+        skippedPastDate++;
         continue;
       }
 
-      await _localNotifications.zonedSchedule(
-        _notificationIdFor(item.id),
-        _reminderTitle(item: item, isThai: isThai),
-        _reminderBody(item: item, isThai: isThai),
-        tz.TZDateTime.from(remindAt.toUtc(), tz.UTC),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channelId,
-            _channelName,
-            channelDescription: _channelDescription,
-            importance: Importance.high,
-            priority: Priority.high,
-          ),
-          iOS: DarwinNotificationDetails(),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: item.id,
+      final notificationTitle = _reminderTitle(
+        item: item,
+        isThai: isThai,
       );
+      final notificationBody = _reminderBody(
+        item: item,
+        dueAt: dueAt,
+        isThai: isThai,
+      );
+
+      final notificationId = _notificationIdFor(item.id);
+      debugPrint('🔔 [NOTIF] Scheduling notification for "${item.title}"');
+      debugPrint('  - Title: $notificationTitle');
+      debugPrint('  - Body: $notificationBody');
+      debugPrint('  - Schedule time (remindAt): $remindAt');
+      debugPrint('  - Notification ID: $notificationId');
+
+      try {
+        await _localNotifications.zonedSchedule(
+          notificationId,
+          notificationTitle,
+          notificationBody,
+          tz.TZDateTime.from(remindAt.toUtc(), tz.UTC),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              _channelId,
+              _channelName,
+              channelDescription: _channelDescription,
+              icon: _androidSmallIcon,
+              importance: Importance.high,
+              priority: Priority.high,
+            ),
+            iOS: DarwinNotificationDetails(),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: item.id,
+        );
+        scheduledCount++;
+        debugPrint('🔔 [NOTIF] ✅ Successfully scheduled notification');
+      } catch (e) {
+        debugPrint('🔔 [NOTIF] ❌ Error scheduling notification: $e');
+      }
     }
+
+    debugPrint('🔔 [NOTIF] ===== SUMMARY =====');
+    debugPrint('🔔 [NOTIF] Total items: ${items.length}');
+    debugPrint('🔔 [NOTIF] Scheduled: $scheduledCount');
+    debugPrint('🔔 [NOTIF] Skipped (completed): $skippedCompleted');
+    debugPrint('🔔 [NOTIF] Skipped (past date): $skippedPastDate');
+    debugPrint('🔔 [NOTIF] Skipped (parse error): $skippedParseError');
   }
 
   String _reminderTitle({
     required PlazoItem item,
     required bool isThai,
   }) {
-    if (isThai) {
-      return item.type == ItemType.exam ? 'เตือนสอบ' : 'เตือนงาน';
-    }
-    return item.type == ItemType.exam ? 'Exam Reminder' : 'Task Reminder';
+    final category = isThai
+        ? (item.type == ItemType.exam ? 'เตือนสอบ' : 'เตือนงาน')
+        : (item.type == ItemType.exam ? 'Exam Reminder' : 'Task Reminder');
+    return '$_appDisplayName • $category';
   }
 
   String _reminderBody({
     required PlazoItem item,
+    required DateTime dueAt,
     required bool isThai,
   }) {
+    final scheduledTime = _formatReminderDateTime(dueAt, isThai: isThai);
+    return isThai
+        ? '${item.subject} • ${item.title}\nกำหนดส่ง/สอบเวลา $scheduledTime'
+        : '${item.subject} • ${item.title}\nDue at $scheduledTime';
+  }
+
+  String _formatReminderDateTime(DateTime dateTime, {required bool isThai}) {
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final year = dateTime.year.toString();
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+
     if (isThai) {
-      return '${item.title} (${item.subject}) เวลา ${item.time}';
+      return '$day/$month/$year $hour:$minute';
     }
-    return '${item.title} (${item.subject}) at ${item.time}';
+
+    return '$day/$month/$year $hour:$minute';
   }
 
   Duration _leadDuration(String leadTime) {
@@ -238,6 +368,9 @@ class NotificationService {
       case '1h':
         return const Duration(hours: 1);
       case '30m':
+        return const Duration(minutes: 30);
+      case '5m':
+        return const Duration(minutes: 5);
       default:
         return const Duration(minutes: 30);
     }
@@ -247,9 +380,7 @@ class NotificationService {
     final dateParts = item.date.split('/');
     final timeParts = item.time.split(':');
 
-    if (dateParts.length != 3 || timeParts.length != 2) {
-      return null;
-    }
+    if (dateParts.length != 3 || timeParts.length != 2) return null;
 
     final day = int.tryParse(dateParts[0]);
     final month = int.tryParse(dateParts[1]);
@@ -257,11 +388,9 @@ class NotificationService {
     final hour = int.tryParse(timeParts[0]);
     final minute = int.tryParse(timeParts[1]);
 
-    if (day == null || month == null || year == null || hour == null || minute == null) {
-      return null;
-    }
+    if ([day, month, year, hour, minute].contains(null)) return null;
 
-    return DateTime(year, month, day, hour, minute);
+    return DateTime(year!, month!, day!, hour!, minute!);
   }
 
   int _notificationIdFor(String itemId) {
@@ -302,9 +431,7 @@ class NotificationService {
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     final notification = message.notification;
-    if (notification == null) {
-      return;
-    }
+    if (notification == null) return;
 
     await _localNotifications.show(
       message.hashCode,
@@ -315,6 +442,7 @@ class NotificationService {
           _channelId,
           _channelName,
           channelDescription: _channelDescription,
+          icon: _androidSmallIcon,
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -324,7 +452,19 @@ class NotificationService {
     );
   }
 
-  void _handleMessageOpenedApp(RemoteMessage message) {
-    // Reserved for deep-link routing on notification tap.
+  void _handleMessageOpenedApp(RemoteMessage message) {}
+
+  Future<bool> _hasLocalNotificationPermission() async {
+    final androidPlugin =
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) {
+      debugPrint('🔔 [NOTIF] _hasLocalNotificationPermission: No Android plugin, returning true');
+      return true;
+    }
+
+    final enabled = await androidPlugin.areNotificationsEnabled();
+    debugPrint('🔔 [NOTIF] _hasLocalNotificationPermission: Android result=$enabled');
+    return enabled ?? true;
   }
 }

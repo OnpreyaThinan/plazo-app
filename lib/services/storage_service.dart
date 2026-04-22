@@ -10,6 +10,10 @@ import '../models.dart';
 
 class StorageService {
 	static const String _itemsKey = 'plazo_items';
+	static const String _guestItemsKey = 'plazo_items_guest';
+	static const String _legacyNotificationLeadTimeKey = 'notification_lead_time';
+	static const String _legacyNotificationsEnabledKey = 'notifications_enabled';
+	static const String _legacyLastLoginKey = 'lastLogin';
 	static const String _remoteItemsDocId = 'items';
 	static const String _languageKey = 'plazo_language';
 	static const String _darkModeKey = 'plazo_dark_mode';
@@ -18,6 +22,50 @@ class StorageService {
 	static const String _privacyConsentVersionKey = 'plazo_privacy_consent_version';
 	static const String _sessionIdKey = 'plazo_session_id';
 	static String _avatarBytesKey(String uid) => 'plazo_avatar_bytes_$uid';
+	static String _languageKeyForUid(String uid) {
+		if (uid.isEmpty) return _languageKey;
+		return 'plazo_language_$uid';
+	}
+
+	static String _darkModeKeyForUid(String uid) {
+		if (uid.isEmpty) return _darkModeKey;
+		return 'plazo_dark_mode_$uid';
+	}
+
+	static String _privacyConsentKeyForUid(String uid) {
+		if (uid.isEmpty) return _privacyConsentKey;
+		return 'plazo_privacy_consent_v1_$uid';
+	}
+
+	static String _privacyConsentAtKeyForUid(String uid) {
+		if (uid.isEmpty) return _privacyConsentAtKey;
+		return 'plazo_privacy_consent_at_$uid';
+	}
+
+	static String _privacyConsentVersionKeyForUid(String uid) {
+		if (uid.isEmpty) return _privacyConsentVersionKey;
+		return 'plazo_privacy_consent_version_$uid';
+	}
+	static String _notificationLeadTimeKeyForUid(String uid) {
+		if (uid.isEmpty) return _legacyNotificationLeadTimeKey;
+		return 'notification_lead_time_$uid';
+	}
+
+	static String _notificationsEnabledKeyForUid(String uid) {
+		if (uid.isEmpty) return _legacyNotificationsEnabledKey;
+		return 'notifications_enabled_$uid';
+	}
+
+	static String _lastLoginKeyForUid(String uid) {
+		if (uid.isEmpty) return _legacyLastLoginKey;
+		return 'lastLogin_$uid';
+	}
+	static String _itemsKeyForUid(String uid) {
+		if (uid.isEmpty) {
+			return _guestItemsKey;
+		}
+		return 'plazo_items_$uid';
+	}
 
 	static Future<T> _readWithFallback<T>(
 		Future<T> Function(SharedPreferences prefs) reader,
@@ -79,9 +127,10 @@ class StorageService {
 		);
 	}
 
-	static Future<List<PlazoItem>> _loadLocalItems() async {
+	static Future<List<PlazoItem>> _loadLocalItems({required String uid}) async {
+		final itemsKey = _itemsKeyForUid(uid);
 		return _readWithFallback((prefs) async {
-			final rawItems = prefs.getStringList(_itemsKey) ?? [];
+			final rawItems = prefs.getStringList(itemsKey) ?? [];
 			return rawItems
 					.map((entry) => jsonDecode(entry) as Map<String, dynamic>)
 					.map(_itemFromMap)
@@ -89,10 +138,19 @@ class StorageService {
 		}, <PlazoItem>[]);
 	}
 
-	static Future<void> _saveLocalItems(List<PlazoItem> items) async {
+	static Future<void> _saveLocalItems({
+		required String uid,
+		required List<PlazoItem> items,
+	}) async {
+		final itemsKey = _itemsKeyForUid(uid);
 		await _writeIgnoringFailure((prefs) async {
 			final serialized = items.map((item) => jsonEncode(_itemToMap(item))).toList();
-			await prefs.setStringList(_itemsKey, serialized);
+			await prefs.setStringList(itemsKey, serialized);
+
+			// Remove legacy shared cache to prevent cross-account data mixing.
+			if (uid.isNotEmpty && prefs.containsKey(_itemsKey)) {
+				await prefs.remove(_itemsKey);
+			}
 		});
 	}
 
@@ -126,7 +184,11 @@ class StorageService {
 	}
 
 	static Future<List<PlazoItem>> loadItems({String uid = ''}) async {
-		final localItems = await _loadLocalItems();
+		final localItems = await _loadLocalItems(uid: uid);
+
+		if (uid.isEmpty) {
+			return localItems;
+		}
 
 		try {
 			final remoteItems = await _loadRemoteItems(uid: uid);
@@ -142,11 +204,8 @@ class StorageService {
 				}
 
 				final mergedItems = mergedById.values.toList();
-				await _saveLocalItems(mergedItems);
-
-				if (uid.isNotEmpty) {
-					await _saveRemoteItems(uid: uid, items: mergedItems);
-				}
+				await _saveLocalItems(uid: uid, items: mergedItems);
+				await _saveRemoteItems(uid: uid, items: mergedItems);
 
 				return mergedItems;
 			}
@@ -158,7 +217,7 @@ class StorageService {
 	}
 
 	static Future<void> saveItems({String uid = '', required List<PlazoItem> items}) async {
-		await _saveLocalItems(items);
+		await _saveLocalItems(uid: uid, items: items);
 
 		try {
 			await _saveRemoteItems(uid: uid, items: items);
@@ -167,27 +226,53 @@ class StorageService {
 		}
 	}
 
-	static Future<String> loadLanguage() async {
+	static Future<String> loadLanguage() async => loadLanguageForUid(uid: '');
+
+	static Future<String> loadLanguageForUid({required String uid}) async {
 		return _readWithFallback((prefs) async {
-			return prefs.getString(_languageKey) ?? 'en';
+			final scoped = prefs.getString(_languageKeyForUid(uid));
+			if (scoped != null && scoped.isNotEmpty) {
+				return scoped;
+			}
+
+			return 'en';
 		}, 'en');
 	}
 
-	static Future<void> saveLanguage(String language) async {
+	static Future<void> saveLanguage(String language) async =>
+		saveLanguageForUid(uid: '', language: language);
+
+	static Future<void> saveLanguageForUid({
+		required String uid,
+		required String language,
+	}) async {
 		await _writeIgnoringFailure((prefs) async {
-			await prefs.setString(_languageKey, language);
+			await prefs.setString(_languageKeyForUid(uid), language);
 		});
 	}
 
-	static Future<bool> loadDarkMode() async {
+	static Future<bool> loadDarkMode() async => loadDarkModeForUid(uid: '');
+
+	static Future<bool> loadDarkModeForUid({required String uid}) async {
 		return _readWithFallback((prefs) async {
-			return prefs.getBool(_darkModeKey) ?? false;
+			final scoped = prefs.getBool(_darkModeKeyForUid(uid));
+			if (scoped != null) {
+				return scoped;
+			}
+
+			return false;
 		}, false);
 	}
 
-	static Future<void> saveDarkMode(bool value) async {
+	static Future<void> saveDarkMode(bool value) async =>
+		saveDarkModeForUid(uid: '', value: value);
+
+	static Future<void> saveDarkModeForUid({
+		required String uid,
+		required bool value,
+	}) async {
 		await _writeIgnoringFailure((prefs) async {
-			await prefs.setBool(_darkModeKey, value);
+			await prefs.setBool(_darkModeKeyForUid(uid), value);
 		});
 	}
 
@@ -207,16 +292,29 @@ class StorageService {
 		required bool accepted,
 		required String policyVersion,
 		DateTime? acceptedAt,
+	}) async =>
+		savePrivacyConsentRecordForUid(
+			uid: '',
+			accepted: accepted,
+			policyVersion: policyVersion,
+			acceptedAt: acceptedAt,
+		);
+
+	static Future<void> savePrivacyConsentRecordForUid({
+		required String uid,
+		required bool accepted,
+		required String policyVersion,
+		DateTime? acceptedAt,
 	}) async {
 		await _writeIgnoringFailure((prefs) async {
-			await prefs.setBool(_privacyConsentKey, accepted);
+			await prefs.setBool(_privacyConsentKeyForUid(uid), accepted);
 			if (accepted) {
 				final timestamp = (acceptedAt ?? DateTime.now()).toIso8601String();
-				await prefs.setString(_privacyConsentAtKey, timestamp);
-				await prefs.setString(_privacyConsentVersionKey, policyVersion);
+				await prefs.setString(_privacyConsentAtKeyForUid(uid), timestamp);
+				await prefs.setString(_privacyConsentVersionKeyForUid(uid), policyVersion);
 			} else {
-				await prefs.remove(_privacyConsentAtKey);
-				await prefs.remove(_privacyConsentVersionKey);
+				await prefs.remove(_privacyConsentAtKeyForUid(uid));
+				await prefs.remove(_privacyConsentVersionKeyForUid(uid));
 			}
 		});
 	}
@@ -233,6 +331,28 @@ class StorageService {
 		}, null);
 	}
 
+	static Future<bool> hasAcceptedCurrentPrivacyPolicy({
+		required String policyVersion,
+	}) async => hasAcceptedCurrentPrivacyPolicyForUid(
+		uid: '',
+		policyVersion: policyVersion,
+	);
+
+	static Future<bool> hasAcceptedCurrentPrivacyPolicyForUid({
+		required String uid,
+		required String policyVersion,
+	}) async {
+		return _readWithFallback((prefs) async {
+			final accepted = (prefs.getBool(_privacyConsentKeyForUid(uid)) ?? false);
+			if (!accepted) {
+				return false;
+			}
+
+			final acceptedVersion = prefs.getString(_privacyConsentVersionKeyForUid(uid));
+			return acceptedVersion == policyVersion;
+		}, false);
+	}
+
 	// Generic string storage methods for app state
 	static Future<String?> getString(String key) async {
 		return _readWithFallback((prefs) async {
@@ -244,6 +364,70 @@ class StorageService {
 		await _writeIgnoringFailure((prefs) async {
 			await prefs.setString(key, value);
 		});
+	}
+
+	static Future<String?> loadNotificationLeadTime({required String uid}) async {
+		return _readWithFallback((prefs) async {
+			final scopedKey = _notificationLeadTimeKeyForUid(uid);
+			final scoped = prefs.getString(scopedKey);
+			if (scoped != null) return scoped;
+
+			return null;
+		}, null);
+	}
+
+	static Future<void> saveNotificationLeadTime({
+		required String uid,
+		required String leadTime,
+	}) async {
+		await _writeIgnoringFailure((prefs) async {
+			await prefs.setString(_notificationLeadTimeKeyForUid(uid), leadTime);
+		});
+	}
+
+	static Future<bool> loadNotificationsEnabled({required String uid}) async {
+		return _readWithFallback((prefs) async {
+			final scopedKey = _notificationsEnabledKeyForUid(uid);
+			final scoped = prefs.getString(scopedKey);
+			if (scoped != null) return scoped == 'true';
+
+			return false;
+		}, false);
+	}
+
+	static Future<void> saveNotificationsEnabled({
+		required String uid,
+		required bool enabled,
+	}) async {
+		await _writeIgnoringFailure((prefs) async {
+			await prefs.setString(
+				_notificationsEnabledKeyForUid(uid),
+				enabled.toString(),
+			);
+		});
+	}
+
+	static Future<void> saveLastLoginAt({
+		required String uid,
+		DateTime? at,
+	}) async {
+		await _writeIgnoringFailure((prefs) async {
+			await prefs.setString(
+				_lastLoginKeyForUid(uid),
+				(at ?? DateTime.now()).toIso8601String(),
+			);
+		});
+	}
+
+	static Future<DateTime?> loadLastLoginAt({required String uid}) async {
+		return _readWithFallback((prefs) async {
+			final scoped = prefs.getString(_lastLoginKeyForUid(uid));
+			if (scoped != null && scoped.isNotEmpty) {
+				return DateTime.tryParse(scoped);
+			}
+
+			return null;
+		}, null);
 	}
 
 	static Future<String> getOrCreateSessionId() async {

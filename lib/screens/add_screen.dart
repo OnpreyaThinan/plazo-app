@@ -6,10 +6,12 @@ import '../models.dart';
 
 class AddScreen extends StatefulWidget {
   final String language;
+  final double contentBottomPadding;
   final Future<void> Function(PlazoItem) onAdd;
   const AddScreen({
     super.key,
     required this.language,
+    this.contentBottomPadding = 0,
     required this.onAdd,
   });
 
@@ -103,7 +105,7 @@ class _AddScreenState extends State<AddScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + widget.contentBottomPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

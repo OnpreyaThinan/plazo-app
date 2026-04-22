@@ -1,4 +1,4 @@
-package com.example.plazo_app
+package com.plazo.app
 
 import io.flutter.embedding.android.FlutterActivity
 

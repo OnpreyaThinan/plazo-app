@@ -39,10 +39,13 @@ class PlazoApp extends StatefulWidget {
 
 class _PlazoAppState extends State<PlazoApp> {
   final _authService = AuthService();
+  String _activePreferenceUid = '';
+  bool _isLoadingPreferences = false;
   String _language = 'en';
   bool _darkMode = false;
   bool _privacyConsentAccepted = false;
   bool _privacyNoticeShown = false;
+  bool _privacyNoticeScheduled = false;
   bool _isReady = false;
   bool _showSplash = true;
   int _mainNavigationIndex = 0;
@@ -52,7 +55,7 @@ class _PlazoAppState extends State<PlazoApp> {
   @override
   void initState() {
     super.initState();
-    _loadPreferences();
+    _loadPreferencesForUid(uid: '', markReady: true);
     _startSplashDelay();
   }
 
@@ -63,26 +66,86 @@ class _PlazoAppState extends State<PlazoApp> {
     });
   }
 
-  Future<void> _loadPreferences() async {
-    final language = await StorageService.loadLanguage();
-    final darkMode = await StorageService.loadDarkMode();
-    final privacyConsentAccepted = await StorageService.loadPrivacyConsent();
+  Future<void> _loadPreferencesForUid({
+    required String uid,
+    bool markReady = false,
+  }) async {
+    final language = await StorageService.loadLanguageForUid(uid: uid);
+    final darkMode = await StorageService.loadDarkModeForUid(uid: uid);
+    final privacyConsentAccepted =
+        await StorageService.hasAcceptedCurrentPrivacyPolicyForUid(
+      uid: uid,
+      policyVersion: PrivacyPolicyContent.currentVersion,
+    );
     if (!mounted) return;
     setState(() {
+      _activePreferenceUid = uid;
       _language = language;
       _darkMode = darkMode;
       _privacyConsentAccepted = privacyConsentAccepted;
-      _isReady = true;
+      _privacyNoticeShown = false;
+      _privacyNoticeScheduled = false;
+      if (markReady) {
+        _isReady = true;
+      }
     });
+
+    // Re-check notice display after state is updated for this uid.
+    if (!privacyConsentAccepted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _schedulePrivacyNotice(context);
+      });
+    }
+  }
+
+  void _syncPreferencesForUidIfNeeded(String uid) {
+    if (_activePreferenceUid == uid || _isLoadingPreferences) {
+      return;
+    }
+
+    _isLoadingPreferences = true;
+    unawaited(
+      _loadPreferencesForUid(uid: uid).whenComplete(() {
+        _isLoadingPreferences = false;
+      }),
+    );
   }
 
   Future<void> _acceptPrivacyConsent() async {
-    await StorageService.savePrivacyConsentRecord(
+    await StorageService.savePrivacyConsentRecordForUid(
+      uid: _activePreferenceUid,
       accepted: true,
       policyVersion: PrivacyPolicyContent.currentVersion,
     );
     if (!mounted) return;
-    setState(() => _privacyConsentAccepted = true);
+    setState(() {
+      _privacyConsentAccepted = true;
+      _privacyNoticeShown = true;
+    });
+  }
+
+  void _schedulePrivacyNotice(BuildContext context) {
+    if (_privacyConsentAccepted || _privacyNoticeShown || _privacyNoticeScheduled) {
+      return;
+    }
+
+    _privacyNoticeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _privacyConsentAccepted) {
+        _privacyNoticeScheduled = false;
+        return;
+      }
+
+      try {
+        await _showPrivacyNoticeDialog(context);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _privacyNoticeShown = false);
+      } finally {
+        _privacyNoticeScheduled = false;
+      }
+    });
   }
 
   Future<void> _showPrivacyNoticeDialog(BuildContext context) async {
@@ -144,12 +207,12 @@ class _PlazoAppState extends State<PlazoApp> {
 
   void _changeLanguage(String language) {
     setState(() => _language = language);
-    StorageService.saveLanguage(language);
+    StorageService.saveLanguageForUid(uid: _activePreferenceUid, language: language);
   }
 
   void _toggleDarkMode(bool value) {
     setState(() => _darkMode = value);
-    StorageService.saveDarkMode(value);
+    StorageService.saveDarkModeForUid(uid: _activePreferenceUid, value: value);
   }
 
   void _handleMainNavigationIndexChanged(int index) {
@@ -161,8 +224,7 @@ class _PlazoAppState extends State<PlazoApp> {
 
   void _bindNotificationsForUser(String uid) {
     unawaited(() async {
-      final enabledPreference = await StorageService.getString('notifications_enabled');
-      final isEnabled = enabledPreference != 'false';
+      final isEnabled = await StorageService.loadNotificationsEnabled(uid: uid);
       await NotificationService.instance.bindUser(
         uid,
         enabled: isEnabled,
@@ -282,13 +344,7 @@ class _PlazoAppState extends State<PlazoApp> {
       home: StreamBuilder<User?>(
         stream: _authService.authStateChanges,
         builder: (context, snapshot) {
-          if (!_privacyConsentAccepted && !_privacyNoticeShown) {
-            _privacyNoticeShown = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              _showPrivacyNoticeDialog(context);
-            });
-          }
+          _schedulePrivacyNotice(context);
 
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Scaffold(
@@ -303,6 +359,17 @@ class _PlazoAppState extends State<PlazoApp> {
           User? firebaseUser = snapshot.data;
 
           if (firebaseUser != null) {
+            _syncPreferencesForUidIfNeeded(firebaseUser.uid);
+            if (_activePreferenceUid != firebaseUser.uid) {
+              return Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+              );
+            }
+
             _bindNotificationsForUser(firebaseUser.uid);
             // User is logged in
             UserProfile currentUser = _createUserProfile(firebaseUser);
@@ -321,6 +388,17 @@ class _PlazoAppState extends State<PlazoApp> {
               },
             );
           } else {
+            _syncPreferencesForUidIfNeeded('');
+            if (_activePreferenceUid.isNotEmpty) {
+              return Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                ),
+              );
+            }
+
             unawaited(NotificationService.instance.unbindUser());
             // User is not logged in
             return LoginScreen(

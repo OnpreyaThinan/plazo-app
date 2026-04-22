@@ -14,6 +14,67 @@
       },
       "oauth_client": [
         {
+          "client_id": "63966643748-oon519jbmohfncc7742suettl1icgnvv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.plazo_app",
+            "certificate_hash": "58b3a431f9ce14d406219f726c08b7b1c9a5dcf5"
+          }
+        },
+        {
+          "client_id": "63966643748-4mqm3mn33ebelttupl358cdbm6365ctt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYZ9d52fMB1wA7K0-kavdHHCYroJD9QD8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "63966643748-4mqm3mn33ebelttupl358cdbm6365ctt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63966643748:android:cb429cbb36256645b9fab1",
+        "android_client_info": {
+          "package_name": "com.plazo.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "63966643748-f2vaeu4mu8oc2u4k746272d3pooqrfdf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plazo.app",
+            "certificate_hash": "58b3a431f9ce14d406219f726c08b7b1c9a5dcf5"
+          }
+        },
+        {
+          "client_id": "63966643748-iafstqo2h1sam4q0rqt8au622kb6p8mr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plazo.app",
+            "certificate_hash": "42526499c8058161fa28a27b197c6d29457ace36"
+          }
+        },
+        {
+          "client_id": "63966643748-qibv0tooap10s955t8p6fddid50tuq6g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plazo.app",
+            "certificate_hash": "9de05fc4a5a4d109ba708f88d7a77637ee48cc4b"
+          }
+        },
+        {
           "client_id": "63966643748-4mqm3mn33ebelttupl358cdbm6365ctt.apps.googleusercontent.com",
           "client_type": 3
         }

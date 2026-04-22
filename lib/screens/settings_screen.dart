@@ -19,6 +19,7 @@ class SettingsScreen extends StatefulWidget {
   final UserProfile user;
   final String language;
   final bool darkMode;
+  final double contentBottomPadding;
   final Function(String) onLanguageChange;
   final Function(bool) onDarkModeChange;
   final VoidCallback onLogout;
@@ -30,6 +31,7 @@ class SettingsScreen extends StatefulWidget {
     required this.user,
     required this.language,
     required this.darkMode,
+    this.contentBottomPadding = 0,
     required this.onLanguageChange,
     required this.onDarkModeChange,
     required this.onLogout,
@@ -42,8 +44,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const String _notificationLeadTimeKey = 'notification_lead_time';
-  static const String _notificationsEnabledKey = 'notifications_enabled';
+  String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   late UserProfile _user;
   late TextEditingController _nameController;
   late TextEditingController _emailController;
@@ -96,27 +97,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadNotificationPreference() async {
-    final saved = await StorageService.getString(_notificationLeadTimeKey);
-    final enabled = await StorageService.getString(_notificationsEnabledKey);
+    final uid = _currentUid;
+    final saved = await StorageService.loadNotificationLeadTime(uid: uid);
+    final enabled = await StorageService.loadNotificationsEnabled(uid: uid);
     if (!mounted) return;
-    if (saved == '30m' || saved == '1h' || saved == '1d') {
+    if (saved == '5m' || saved == '30m' || saved == '1h' || saved == '1d') {
       setState(() => _notificationLeadTime = saved!);
     }
-    if (enabled != null) {
-      setState(() => _notificationsEnabled = enabled == 'true');
-    }
+    setState(() => _notificationsEnabled = enabled);
   }
 
   Future<void> _saveNotificationPreference(String value) async {
     setState(() => _notificationLeadTime = value);
-    await StorageService.setString(_notificationLeadTimeKey, value);
+    await StorageService.saveNotificationLeadTime(uid: _currentUid, leadTime: value);
     await widget.onNotificationPreferencesChanged();
   }
 
   Future<void> _saveNotificationsEnabled(bool value) async {
+    debugPrint('🔔 [NOTIF] _saveNotificationsEnabled called - value=$value');
+
     if (value) {
+      debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Requesting permission (enabling)');
       final allowed = await NotificationService.instance.requestPermission();
+      debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Permission result=$allowed');
+      
       if (!allowed) {
+        debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Permission denied, showing error');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -129,17 +135,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
         setState(() => _notificationsEnabled = false);
-        await StorageService.setString(_notificationsEnabledKey, 'false');
+    await StorageService.saveNotificationsEnabled(uid: _currentUid, enabled: false);
         await widget.onNotificationPreferencesChanged();
         return;
       }
     }
 
+    debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Saving value=$value to storage');
     setState(() => _notificationsEnabled = value);
-    await StorageService.setString(_notificationsEnabledKey, value.toString());
+    await StorageService.saveNotificationsEnabled(uid: _currentUid, enabled: value);
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Current user UID=$uid');
+    
     if (uid != null && uid.isNotEmpty) {
+      debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Calling bindUser and setNotificationsEnabled');
       await NotificationService.instance.bindUser(
         uid,
         enabled: value,
@@ -150,7 +160,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
 
+    debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Triggering onNotificationPreferencesChanged');
     await widget.onNotificationPreferencesChanged();
+    debugPrint('🔔 [NOTIF] _saveNotificationsEnabled: Completed');
   }
 
   void _syncLocalUserFromFirebase(
@@ -176,10 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       if (resolvedLastLogin == null) {
-        final lastLoginStr = await StorageService.getString('lastLogin');
-        if (lastLoginStr != null) {
-          resolvedLastLogin = DateTime.tryParse(lastLoginStr);
-        }
+    resolvedLastLogin = await StorageService.loadLastLoginAt(uid: uid ?? '');
       }
 
       if (!mounted) return;
@@ -223,29 +232,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final updatedUser = await _authService.updateProfile(avatarBytes: bytes);
       if (!mounted) return;
 
-      if (updatedUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.language == 'th'
-                  ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
-                  : 'Could not sync profile image to server, but it is updated locally on this device.',
-            ),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
+      if (updatedUser != null) {
+        setState(() {
+          _selectedImageBytes = bytes;
+          _syncLocalUserFromFirebase(updatedUser, selectedBytes: bytes);
+        });
+        widget.onUserChanged(_user);
       }
-
-      setState(() {
-        _selectedImageBytes = bytes;
-        _syncLocalUserFromFirebase(updatedUser, selectedBytes: bytes);
-      });
-      widget.onUserChanged(_user);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.language == 'th' ? 'อัปเดตรูปโปรไฟล์แล้ว' : 'Profile image updated.'),
+          content: Text(
+            widget.language == 'th'
+                ? 'เปลี่ยนรูปภาพเรียบร้อยแล้ว'
+                : 'Profile image updated successfully.',
+          ),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -255,10 +256,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SnackBar(
           content: Text(
             widget.language == 'th'
-                ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
-                : 'Could not sync profile image to server, but it is updated locally on this device.',
+                ? 'เปลี่ยนรูปภาพเรียบร้อยแล้ว'
+                : 'Profile image updated successfully.',
           ),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppColors.primary,
         ),
       );
     } catch (e) {
@@ -268,10 +269,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SnackBar(
           content: Text(
             widget.language == 'th'
-                ? 'อัปเดตรูปในระบบไม่สำเร็จ แต่แสดงรูปใหม่ในเครื่องนี้แล้ว'
-                : 'Could not sync profile image to server, but it is updated locally on this device.',
+                ? 'เปลี่ยนรูปภาพเรียบร้อยแล้ว'
+                : 'Profile image updated successfully.',
           ),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: AppColors.primary,
         ),
       );
     }
@@ -750,6 +751,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _notificationLabel(String value) {
     switch (value) {
+      case '5m':
+        return widget.language == 'th' ? 'ก่อน 5 นาที' : '5 minutes before';
       case '1h':
         return widget.language == 'th' ? 'ก่อน 1 ชั่วโมง' : '1 hour before';
       case '1d':
@@ -773,6 +776,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       builder: (sheetContext) {
         final options = <MapEntry<String, String>>[
+          MapEntry('5m', _notificationLabel('5m')),
           MapEntry('30m', _notificationLabel('30m')),
           MapEntry('1h', _notificationLabel('1h')),
           MapEntry('1d', _notificationLabel('1d')),
@@ -987,7 +991,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + widget.contentBottomPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

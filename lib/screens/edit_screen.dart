@@ -164,14 +164,14 @@ class _EditScreenState extends State<EditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final typeLabel =
-        _type == ItemType.exam ? _t('examsUpper') : _t('tasksUpper');
-    final typeColor =
-        _type == ItemType.exam
-            ? AppColors.accentPink
-            : AppColors.accentBlue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseBackground = isDark ? AppColors.darkBg : AppColors.bgDetailLight;
+    final cardBackground = isDark ? Colors.grey[900]! : Colors.white;
+    final typeLabel = _type == ItemType.exam ? _t('examsUpper') : _t('tasksUpper');
+    final typeColor = _type == ItemType.exam ? AppColors.accentPink : AppColors.accentBlue;
 
     return Scaffold(
+      backgroundColor: baseBackground,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -202,87 +202,83 @@ class _EditScreenState extends State<EditScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.primary.withValues(alpha: 0.08),
-              AppColors.accentBlue.withValues(alpha: 0.08),
-              Colors.white,
+              AppColors.primary.withValues(alpha: isDark ? 0.12 : 0.08),
+              AppColors.accentBlue.withValues(alpha: isDark ? 0.12 : 0.08),
+              baseBackground,
             ],
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6),
-                  decoration: BoxDecoration(
-                    color:
-                        typeColor.withValues(alpha: 0.2),
-                    borderRadius:
-                        BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    typeLabel,
-                    style: TextStyle(
-                      color: typeColor,
-                      fontSize: 10,
-                      fontWeight:
-                          FontWeight.w900,
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: cardBackground,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.04),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            typeLabel,
+                            style: TextStyle(
+                              color: typeColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _buildField(_t('subject'), _subjectController, outlined: true),
+                        _buildField(_t('activity'), _titleController, filled: true),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildPickerField(
+                                value: _formatDate(_selectedDate),
+                                icon: Icons.calendar_today,
+                                onTap: _pickDate,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildPickerField(
+                                value: _formatTime(_selectedTime),
+                                icon: Icons.access_time,
+                                onTap: _pickTime,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_type == ItemType.exam)
+                          _buildField(_t('location'), _locationController, filled: true),
+                        _buildField(_t('briefNotes'), _descController, isLong: true, filled: true),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                _buildField(_t('subject'),
-                    _subjectController,
-                    outlined: true),
-                _buildField(_t('activity'),
-                    _titleController,
-                    filled: true),
-                Row(
-                  children: [
-                    Expanded(
-                      child:
-                          _buildPickerField(
-                        value: _formatDate(
-                            _selectedDate),
-                        icon: Icons
-                            .calendar_today,
-                        onTap: _pickDate,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child:
-                          _buildPickerField(
-                        value: _formatTime(
-                            _selectedTime),
-                        icon: Icons
-                            .access_time,
-                        onTap: _pickTime,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_type == ItemType.exam)
-                  _buildField(_t('location'),
-                      _locationController,
-                      filled: true),
-                _buildField(_t('briefNotes'),
-                    _descController,
-                    isLong: true,
-                    filled: true),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -296,25 +292,47 @@ class _EditScreenState extends State<EditScreen> {
     bool filled = false,
     bool outlined = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textMain;
+    final secondaryTextColor = isDark ? Colors.grey[400]! : Colors.grey;
+    final borderColor = outlined
+        ? (isDark ? Colors.grey[600]! : Colors.black87)
+        : Colors.transparent;
+
     return Padding(
       padding:
           const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: controller,
         maxLines: isLong ? 4 : 1,
+        style: TextStyle(
+          color: textColor,
+          fontWeight: FontWeight.w600,
+        ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: TextStyle(color: secondaryTextColor),
+          hintStyle: TextStyle(color: secondaryTextColor),
           filled: true,
           fillColor: filled
-              ? AppColors.bgInput
-              : Colors.transparent,
+              ? (isDark ? Colors.grey[850]! : AppColors.bgInput)
+              : (isDark ? Colors.grey[900]! : Colors.white),
           border: OutlineInputBorder(
             borderRadius:
                 BorderRadius.circular(22),
             borderSide: BorderSide(
-              color: outlined
-                  ? Colors.black87
-                  : Colors.transparent,
+              color: borderColor,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 1.5,
             ),
           ),
         ),
@@ -327,6 +345,10 @@ class _EditScreenState extends State<EditScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textMain;
+    final secondaryTextColor = isDark ? Colors.grey[400]! : Colors.grey;
+
     return Padding(
       padding:
           const EdgeInsets.only(bottom: 16),
@@ -340,7 +362,7 @@ class _EditScreenState extends State<EditScreen> {
                   horizontal: 18,
                   vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.bgInput,
+            color: isDark ? Colors.grey[850]! : AppColors.bgInput,
             borderRadius:
                 BorderRadius.circular(20),
           ),
@@ -349,16 +371,14 @@ class _EditScreenState extends State<EditScreen> {
               Expanded(
                 child: Text(
                   value,
-                  style:
-                      const TextStyle(
-                          fontWeight:
-                              FontWeight.w700),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: textColor),
                 ),
               ),
               Icon(icon,
                   size: 18,
-                  color:
-                      Colors.grey[500]),
+                  color: secondaryTextColor),
             ],
           ),
         ),
@@ -372,6 +392,8 @@ class _EditScreenState extends State<EditScreen> {
     Color iconColor = Colors.black87,
     bool filled = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding:
           const EdgeInsets.only(left: 12),
@@ -384,14 +406,21 @@ class _EditScreenState extends State<EditScreen> {
           decoration: BoxDecoration(
             color: filled
                 ? AppColors.primary
-                : Colors.white,
+                : (isDark ? const Color(0xFF1F2427) : Colors.white),
             shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Icon(
             icon,
             color: filled
                 ? Colors.white
-                : iconColor,
+                : (Theme.of(context).brightness == Brightness.dark ? Colors.white : iconColor),
             size: 20,
           ),
         ),

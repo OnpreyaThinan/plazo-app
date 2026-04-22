@@ -53,6 +53,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return emailRegex.hasMatch(email);
   }
 
+  String _authErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'weak-password':
+        return _t('weakPassword');
+      case 'email-already-in-use':
+        return _t('emailAlreadyInUse');
+      case 'invalid-email':
+        return _t('invalidEmailAddress');
+      case 'operation-not-allowed':
+        return widget.language == 'th'
+            ? 'ยังไม่ได้เปิดใช้งานการสมัครด้วยอีเมลใน Firebase Console'
+            : 'Email/password sign-up is not enabled in Firebase Console.';
+      case 'network-request-failed':
+        return 'Please check your internet connection';
+      default:
+        return _t('signUpFailed');
+    }
+  }
+
   void _validateForm() {
     setState(() {
       _isFormValid = _nameController.text.isNotEmpty &&
@@ -94,14 +113,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        String errorMessage = _t('signUpFailed');
-        if (e.code == 'weak-password') {
-          errorMessage = _t('weakPassword');
-        } else if (e.code == 'email-already-in-use') {
-          errorMessage = _t('emailAlreadyInUse');
-        } else if (e.code == 'invalid-email') {
-          errorMessage = _t('invalidEmailAddress');
-        }
+        final errorMessage = _authErrorMessage(e);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

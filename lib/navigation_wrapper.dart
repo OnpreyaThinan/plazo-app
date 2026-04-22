@@ -39,6 +39,11 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  static const double _navBarHeight = 70;
+  static const double _navBarHorizontalMargin = 24;
+  static const double _navBarBottomGap = 12;
+  static const double _navBarBodySpacing = 112;
+
   int _currentIndex = 0;
   late UserProfile _user;
   late List<PlazoItem> _items;
@@ -83,8 +88,13 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _syncNotificationSchedules() async {
-    final notificationsEnabled = (await StorageService.getString('notifications_enabled')) != 'false';
-    final leadTime = await StorageService.getString('notification_lead_time') ?? '30m';
+    debugPrint('🔔 [NOTIF] _syncNotificationSchedules called for user=${widget.userId}');
+    
+    final notificationsEnabled = await StorageService.loadNotificationsEnabled(uid: widget.userId);
+    final leadTime = await StorageService.loadNotificationLeadTime(uid: widget.userId) ?? '30m';
+
+    debugPrint('🔔 [NOTIF] _syncNotificationSchedules: notificationsEnabled=$notificationsEnabled, leadTime=$leadTime');
+    debugPrint('🔔 [NOTIF] _syncNotificationSchedules: itemCount=${_items.length}');
 
     await NotificationService.instance.syncScheduledReminders(
       items: _items,
@@ -176,6 +186,7 @@ class _MainNavigationState extends State<MainNavigation> {
         builder: (context) => DetailScreen(
           item: item,
           language: widget.language,
+          darkMode: widget.darkMode,
           onUpdate: (updated) {
             setState(() {
               final idx = _items.indexWhere((it) => it.id == updated.id);
@@ -219,16 +230,19 @@ class _MainNavigationState extends State<MainNavigation> {
         userName: _user.name,
         avatarUrl: _user.avatarUrl,
         avatarBytes: _user.avatarBytes,
+        contentBottomPadding: _navBarBodySpacing,
         onDetail: _onDetail,
         onNavigateToProfile: () => _setCurrentIndex(3),
       ),
       CompletedScreen(
         items: _items,
         language: widget.language,
+        contentBottomPadding: _navBarBodySpacing,
         onDetail: _onDetail,
       ),
       AddScreen(
         language: widget.language,
+        contentBottomPadding: _navBarBodySpacing,
         onAdd: (newItem) async {
           setState(() {
             _items = [newItem, ..._items];
@@ -245,6 +259,7 @@ class _MainNavigationState extends State<MainNavigation> {
         user: _user,
         language: widget.language,
         darkMode: widget.darkMode,
+        contentBottomPadding: _navBarBodySpacing,
         onLanguageChange: widget.onLanguageChange,
         onDarkModeChange: widget.onDarkModeChange,
         onLogout: widget.onLogout,
@@ -256,15 +271,29 @@ class _MainNavigationState extends State<MainNavigation> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: screens),
-      bottomNavigationBar: _buildNavBar(),
+      extendBody: true,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IndexedStack(index: _currentIndex, children: screens),
+          ),
+          Positioned(
+            left: _navBarHorizontalMargin,
+            right: _navBarHorizontalMargin,
+            bottom: _navBarBottomGap,
+            child: SafeArea(
+              top: false,
+              child: _buildNavBar(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildNavBar() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 30),
-      height: 70,
+      height: _navBarHeight,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(35),
