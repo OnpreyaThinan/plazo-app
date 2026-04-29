@@ -391,8 +391,15 @@ class StorageService {
 			final scoped = prefs.getString(scopedKey);
 			if (scoped != null) return scoped == 'true';
 
-			return false;
-		}, false);
+			// Keep compatibility with older single-key storage for signed-in users.
+			if (uid.isNotEmpty) {
+				final legacy = prefs.getString(_legacyNotificationsEnabledKey);
+				if (legacy != null) return legacy == 'true';
+			}
+
+			// Default to enabled so first-run users receive reminder scheduling.
+			return true;
+		}, true);
 	}
 
 	static Future<void> saveNotificationsEnabled({
